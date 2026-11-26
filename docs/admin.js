@@ -50,6 +50,27 @@ async function loadMembers() {
     all.push(...page); if (page.length < 1000) break; from += 1000;
   }
   A.members = all;
+  const enr = []; let f2 = 0;
+  while (true) {
+    const page = await q(sb.from('enrollments').select('member_id,class_id').range(f2, f2 + 999));
+    enr.push(...page); if (page.length < 1000) break; f2 += 1000;
+  }
+  A.enr = enr;
+}
+// 한 아이 = 여러 반
+function enrolledClasses(mid) {
+  return A.enr.filter(e => e.member_id === mid).map(e => clsById(e.class_id)).filter(Boolean)
+    .sort((a, b) => (a.days[0] ?? 9) - (b.days[0] ?? 9) || String(a.start_time).localeCompare(String(b.start_time)));
+}
+function classMembers(cid) {
+  const ids = new Set(A.enr.filter(e => e.class_id === cid).map(e => e.member_id));
+  return A.members.filter(m => ids.has(m.id));
+}
+function clsNames(mid) { return enrolledClasses(mid).map(c => c.name).join(', '); }
+function teacherNames(mid) { return [...new Set(enrolledClasses(mid).map(c => c.teacher_id).filter(Boolean).map(staffName))].join(', '); }
+function kidCode(mid) {
+  const pairs = []; enrolledClasses(mid).forEach(c => { const h = +hm(c.start_time).slice(0, 2); c.days.forEach(d => pairs.push([d, (h > 12 ? h - 12 : h)])); });
+  return pairs.sort((a, b) => a[0] - b[0] || a[1] - b[1]).map(([d, h]) => DAYS[d] + h).join('');
 }
 const clsById = (id) => A.classes.find(c => c.id === id);
 const staffName = (id) => (A.staff.find(s => s.user_id === id) || {}).name || '미배정';
@@ -97,7 +118,7 @@ A.pages.dashboard = async (v) => {
   const maxM = Math.max(1, ...byM.map(x => x[1]));
   const td = dow(today);
   const todays = A.classes.filter(c => c.active && c.days.includes(td)).map(c => {
-    const n = M.filter(m => m.class_id === c.id && m.status === '재원').length; return { c, n };
+    const n = classMembers(c.id).filter(m => m.status === '재원').length; return { c, n };
   });
   const expiring = M.filter(m => m.status === '재원' && m.pass_end && m.pass_end >= today && m.pass_end <= wk).sort((a, b) => a.pass_end.localeCompare(b.pass_end));
   const d = new Date();
@@ -130,7 +151,7 @@ A.pages.dashboard = async (v) => {
   <section class="card"><h2 style="margin-bottom:12px">수강권 만료 7일 이내 회원</h2>
     ${expiring.length ? `<div class="grid-auto" style="grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">${expiring.map(m => `
       <a href="#members" data-open="${esc(m.id)}" style="border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;text-decoration:none;color:var(--ink)">
-        <div><div class="bold">${esc(m.name)}</div><div class="small muted">${esc((clsById(m.class_id) || {}).name || '반 없음')} · ${md(m.pass_end)} 만료</div></div>
+        <div><div class="bold">${esc(m.name)}</div><div class="small muted">${esc(clsNames(m.id) || '반 없음')} · ${md(m.pass_end)} 만료</div></div>
         <span class="badge b-warn">D-${daysBetween(today, m.pass_end)}</span></a>`).join('')}</div>` : '<div class="empty">없어요.</div>'}
   </section>`;
   v.onclick = (e) => {

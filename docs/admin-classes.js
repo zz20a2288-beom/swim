@@ -63,7 +63,7 @@ function dayTable(list) {
   const times = [...new Set(dayCls.map(c => hm(c.start_time)))].sort();
   const order = A.staff.map(s => s.user_id);
   const tids = [...new Set(dayCls.map(c => c.teacher_id || null))].sort((a, b) => (a ? order.indexOf(a) : 999) - (b ? order.indexOf(b) : 999));
-  const kidsOf = (c) => A.members.filter(m => m.class_id === c.id && m.status !== '탈회').sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  const kidsOf = (c) => classMembers(c.id).filter(m => m.status !== '탈회').sort((a, b) => a.name.localeCompare(b.name, 'ko'));
   const live = (c) => kidsOf(c).filter(m => m.status === '재원');
   const dayTotal = dayCls.reduce((s, c) => s + live(c).length, 0);
   let h = `<table class="dt"><thead><tr><th rowspan="2" class="dt-time">시간</th>${tids.map(t => `<th colspan="5" class="dt-teacher" style="background:${tColor(t)}">${esc(t ? staffName(t) : '담당 없음')} <b>${dayCls.filter(c => (c.teacher_id || null) === t).reduce((s, c) => s + live(c).length, 0)}</b></th>`).join('')}
@@ -86,7 +86,7 @@ function dayTable(list) {
         if (it && it.label) h += `<td colspan="5" style="${bg};font-size:12px;font-weight:700"><button class="linkbtn" data-cls="${it.label.id}">▸ ${esc(it.label.name)} (${live(it.label).length}/${it.label.capacity})</button></td>`;
         else if (it) {
           const k = it.k, off = k.status === '휴회';
-          h += `<td style="${bg}" class="dt-name"><button class="linkbtn" data-cls="${it.c.id}" title="${esc(it.c.name)}" style="${off ? 'opacity:.55' : ''}">${esc(k.name)}${off ? '<span class="small">(휴)</span>' : ''}</button></td><td style="${bg}">${esc(kAge(k.birth))}</td><td style="${bg}">${esc(k.gender || '')}</td><td style="${bg}">${esc(timeCode(it.c))}</td><td style="${bg}">${esc(STEPS[A.cs.prog[k.id] || 0])}</td>`;
+          h += `<td style="${bg}" class="dt-name"><button class="linkbtn" data-cls="${it.c.id}" title="${esc(it.c.name)}" style="${off ? 'opacity:.55' : ''}">${esc(k.name)}${off ? '<span class="small">(휴)</span>' : ''}</button></td><td style="${bg}">${esc(kAge(k.birth))}</td><td style="${bg}">${esc(k.gender || '')}</td><td style="${bg}">${esc(kidCode(k.id))}</td><td style="${bg}">${esc(STEPS[A.cs.prog[k.id] || 0])}</td>`;
         } else if (r === 0 && col.has && !col.items.length) h += `<td colspan="5" style="${bg}" class="small"><button class="linkbtn" data-cls="${col.first.id}">${esc(col.first.name)} · 아직 아이가 없어요</button></td>`;
         else h += `<td style="${bg}"></td><td style="${bg}"></td><td style="${bg}"></td><td style="${bg}"></td><td style="${bg}"></td>`;
       });
@@ -102,7 +102,7 @@ function weekGrid(list, td) {
   const cols = list.some(c => c.days.includes(6)) ? 7 : 6;
   return `<div class="tt"><div class="tr" style="grid-template-columns:64px repeat(${cols},minmax(0,1fr))"><div class="th"></div>${DAYS.slice(0, cols).map((d, i) => `<div class="th ${i === td ? 'today' : ''}">${d}${i === td ? ' (오늘)' : ''}</div>`).join('')}</div>
     ${times.map(t => `<div class="tr" style="grid-template-columns:64px repeat(${cols},minmax(0,1fr))"><div class="tm">${slotLabel(t)}</div>${[...Array(cols).keys()].map(d => `<div class="cell">${list.filter(c => hm(c.start_time) === t && c.days.includes(d)).map(c => {
-      const n = A.members.filter(m => m.class_id === c.id && m.status === '재원').length;
+      const n = classMembers(c.id).filter(m => m.status === '재원').length;
       return `<button type="button" class="cls ${A.cs.sel === c.id ? 'on' : ''}" data-cls="${c.id}" style="background:${tColor(c.teacher_id)};color:#0F1B2D"><b>${esc(c.name)}</b><span>${esc(staffName(c.teacher_id))} · ${esc(c.level)} · ${n}/${c.capacity}</span></button>`; }).join('')}</div>`).join('')}</div>`).join('')}</div>`;
 }
 
@@ -111,7 +111,7 @@ async function renderRoster() {
   const c = clsById(A.cs.sel);
   if (!c) { box.innerHTML = '<div class="empty">위 표에서 아이 이름이나 반을 누르면 출석·진도를 입력할 수 있어요.</div>'; return; }
   box.innerHTML = '<div class="loading">불러오는 중…</div>';
-  const kids = A.members.filter(m => m.class_id === c.id && m.status !== '탈회').sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  const kids = classMembers(c.id).filter(m => m.status !== '탈회').sort((a, b) => a.name.localeCompare(b.name, 'ko'));
   const ids = kids.map(k => k.id);
   const [att, prog] = ids.length ? await Promise.all([
     q(sb.from('attendance').select('member_id,status').eq('class_id', c.id).eq('date', A.cs.date)),
@@ -150,7 +150,7 @@ async function saveAttendance() {
   const ups = A.cs.rows.filter(r => r.att).map(r => ({ member_id: r.id, class_id: c.id, date, status: r.att }));
   const dels = A.cs.rows.filter(r => !r.att).map(r => r.id);
   const prog = A.cs.rows.filter(r => r.kind === 'child' && (r.step !== r.step0 || r.note !== r.note0)).map(r => ({
-    member_id: r.id, step: r.step, teacher_note: r.note || null, note_updated_at: r.note !== r.note0 ? new Date().toISOString() : undefined }));
+    member_id: r.id, step: r.step, teacher_note: r.note || null, updated_by: A.myId, note_updated_at: r.note !== r.note0 ? new Date().toISOString() : undefined }));
   try {
     if (ups.length) await q(sb.from('attendance').upsert(ups, { onConflict: 'member_id,class_id,date' }));
     if (dels.length) await q(sb.from('attendance').delete().eq('class_id', c.id).eq('date', date).in('member_id', dels));

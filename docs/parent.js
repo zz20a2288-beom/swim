@@ -89,7 +89,7 @@ function render() {
   };
 }
 function homeHtml(k) {
-  const c = k.class, today = todayStr();
+  const cls = k.classes || [], today = todayStr();
   const left = k.pass_end ? daysBetween(today, k.pass_end) : null;
   const att = k.attendance || [];
   const present = att.filter(a => a.status !== '결석').length;
@@ -98,8 +98,7 @@ function homeHtml(k) {
   const now = new Date();
   return `
   <section class="p-card hero"><div class="small muted">우리 아이 수업${k.status === '휴회' ? ' · <b style="color:var(--amber)">휴회 중</b>' : ''}</div>
-    <div style="font-size:20px;font-weight:700;margin-top:4px">${c ? esc(c.name) + ' <span class="small muted" style="font-weight:400">' + esc(c.level) + '</span>' : '반 배정 전'}</div>
-    ${c ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px"><div class="p-tile"><div class="l">요일·시간</div><div class="v">${esc(daysText(c.days))} ${esc(c.start_time)}</div></div><div class="p-tile"><div class="l">담당 선생님</div><div class="v">${esc(c.teacher || '배정 예정')}</div></div></div>` : ''}</section>
+    ${cls.length ? `<div class="col" style="gap:8px;margin-top:10px">${cls.map(c => `<div class="p-tile spread"><div><div class="v" style="margin:0">${esc(daysText(c.days))} ${esc(c.start_time)}</div><div class="l">${esc(c.name)} · ${esc(c.level)}</div></div><div style="text-align:right"><div class="l">선생님</div><div class="v" style="margin:0">${esc(c.teacher || '배정 예정')}</div></div></div>`).join('')}</div>` : '<div style="font-size:18px;font-weight:700;margin-top:4px">반 배정 전</div>'}</section>
   <section class="p-card"><div class="spread"><h2 style="font-size:16px">진도</h2><span class="small bold" style="color:var(--pri)">지금: ${esc(STEPS[step])}</span></div>
     <div class="stp">${STEPS.map((s, i) => `<div><i class="${i < step ? 'done' : i === step ? 'cur' : ''}" aria-hidden="true">${i < step ? '✓' : i === step ? '●' : ''}</i><span class="${i === step ? 'cur' : ''}">${s}</span></div>`).join('')}</div></section>
   <section class="p-card"><div class="spread"><h2 style="font-size:16px">${now.getMonth() + 1}월 출석</h2><span><b style="font-size:18px">${present}</b> / ${att.length}회</span></div>
@@ -109,7 +108,7 @@ function homeHtml(k) {
     ${left !== null && left >= 0 ? `<span class="badge b-warn">D-${left}</span>` : ''}</div>
     ${k.pay_url ? `<a class="btn pri block" href="${esc(safeUrl(k.pay_url))}" target="_blank" rel="noopener noreferrer">바로 결제하기</a><div class="small" style="text-align:center;color:var(--warn)">센터에서 등록한 결제 페이지로 이동해요</div>` : '<div class="small" style="color:var(--warn)">결제는 센터로 문의해 주세요.</div>'}</section>
   ${k.teacher_note ? `<section class="p-card"><h2 style="font-size:16px">선생님 한마디</h2><div style="margin-top:10px;background:var(--pri-l);border-radius:12px;padding:14px;line-height:1.6;white-space:pre-line">${esc(k.teacher_note)}</div>
-    <div class="small muted" style="margin-top:8px">${esc(c && c.teacher ? c.teacher + ' 선생님' : '')}${k.note_updated_at ? ' · ' + md(k.note_updated_at.slice(0, 10)) : ''}</div></section>` : ''}
+    <div class="small muted" style="margin-top:8px">${esc(k.note_teacher ? k.note_teacher + ' 선생님' : '')}${k.note_updated_at ? ' · ' + md(k.note_updated_at.slice(0, 10)) : ''}</div></section>` : ''}
   <section class="p-card"><div class="spread"><h2 style="font-size:16px">센터 소식</h2><button class="btn sm" data-tab="news">전체 보기</button></div>
     ${P.notices.length ? P.notices.slice(0, 3).map(n => `<div class="notice">${n.pinned ? '<span class="badge b-navy">고정</span> ' : ''}<b>${esc(n.title)}</b><div class="small muted">${md(n.created_at.slice(0, 10))}</div></div>`).join('') : '<div class="small muted" style="margin-top:8px">새 소식이 없어요.</div>'}</section>
   <section class="p-card"><h2 style="font-size:16px">셔틀 정보</h2>

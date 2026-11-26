@@ -38,7 +38,7 @@ A.pages.notices = async (v) => {
 const IMPORT_FIELDS = {
   members: [['name', '이름 *', /이름|성명|회원명|원생/], ['birth', '생년월일', /생년|생일|출생/], ['gender', '성별', /성별/], ['school', '학교', /학교|학년|유치원/],
     ['guardian_phone1', '보호자 전화 1', /(엄마|모|보호자|부모|연락처|전화|핸드폰|HP|휴대)/i], ['guardian_phone2', '보호자 전화 2', /(아빠|부\b|부 |비상|연락처2|전화2)/i],
-    ['shuttle_route', '셔틀 노선', /셔틀|차량|노선|버스/], ['class_name', '반 이름', /^반$|반명|클래스|수업/], ['address', '주소 (직원 전용)', /주소/], ['memo', '메모 (직원 전용)', /메모|비고|특이/],
+    ['shuttle_route', '셔틀 노선', /셔틀|차량|노선|버스/], ['class_name', '반 이름 (여러 반은 , 로 구분)', /^반$|반명|클래스|수업/], ['address', '주소 (직원 전용)', /주소/], ['memo', '메모 (직원 전용)', /메모|비고|특이/],
     ['first_registered', '최초 등록일', /최초|등록일|입회|가입/], ['pass_end', '수강권 만료일', /만료|종료|마감/]],
   payments: [['name', '이름 *', /이름|성명|회원명/], ['birth', '생년월일 (동명이인 구분)', /생년|생일/], ['paid_at', '결제일 *', /결제일|날짜|일자/], ['amount', '금액 *', /금액|결제액|수강료/],
     ['method', '결제수단', /수단|결제방법|카드|구분/], ['months', '개월', /개월|기간/], ['type', '신규/재등록', /신규|재등록|등록구분/]]
@@ -145,7 +145,7 @@ function convertRow(r, kind, mode) {
     v.school = String(pick(r, 'school')).trim() || null; v.guardian_phone1 = phone(pick(r, 'guardian_phone1')); v.guardian_phone2 = phone(pick(r, 'guardian_phone2'));
     v.shuttle_route = String(pick(r, 'shuttle_route')).trim() || null; v.class_name = String(pick(r, 'class_name')).trim() || null;
     v.address = String(pick(r, 'address')).trim() || null; v.memo = String(pick(r, 'memo')).trim() || null;
-    if (v.class_name && !A.classes.find(c => c.name === v.class_name)) v.memo = [v.memo, '엑셀 반: ' + v.class_name].filter(Boolean).join(' / ');
+    if (v.class_name) { const miss = v.class_name.split(/[,/·]/).map(x => x.trim()).filter(x => x && !A.classes.find(c => c.name === x)); if (miss.length) v.memo = [v.memo, '엑셀 반(못 찾음): ' + miss.join(', ')].filter(Boolean).join(' / '); }
     const dup = A.members.some(m => m.name === v.name && (m.birth || null) === (v.birth || null) && m.kind === k);
     return { ok: !err, err, v, dup };
   }

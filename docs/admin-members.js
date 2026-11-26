@@ -43,8 +43,8 @@ function filtered() {
   const f = A.mf, qq = f.q.replace(/[-\s]/g, '').toLowerCase(), today = todayStr(), wk = addDays(today, 7);
   return A.members.filter(m =>
     (!f.kind || m.kind === f.kind) && (!f.status || m.status === f.status) &&
-    (!f.cls || (f.cls === 'none' ? !m.class_id : m.class_id === f.cls)) &&
-    (!f.teacher || (f.teacher === 'none' ? !(clsById(m.class_id) || {}).teacher_id : (clsById(m.class_id) || {}).teacher_id === f.teacher)) && (!f.route || m.shuttle_route === f.route) &&
+    (!f.cls || (f.cls === 'none' ? !A.enr.some(e => e.member_id === m.id) : A.enr.some(e => e.member_id === m.id && e.class_id === f.cls))) &&
+    (!f.teacher || (f.teacher === 'none' ? !enrolledClasses(m.id).some(c => c.teacher_id) : enrolledClasses(m.id).some(c => c.teacher_id === f.teacher))) && (!f.route || m.shuttle_route === f.route) &&
     (!f.expiring || (m.pass_end && m.pass_end >= today && m.pass_end <= wk)) &&
     (!qq || [m.name, m.school, m.guardian_phone1, m.guardian_phone2].some(x => (x || '').replace(/[-\s]/g, '').toLowerCase().includes(qq))));
 }
@@ -57,9 +57,9 @@ function renderMemberList() {
   const today = todayStr(), show = rows.slice(0, 300);
   document.getElementById('mList').innerHTML = rows.length ? `<div class="tbl-wrap"><table class="tbl" style="min-width:720px">
     <thead><tr><th>이름</th><th>생년월일</th><th>반</th><th>담당</th><th>보호자 전화</th><th>셔틀</th><th>수강권 만료</th><th>상태</th></tr></thead><tbody>
-    ${show.map(m => { const c = clsById(m.class_id); const left = m.pass_end ? daysBetween(today, m.pass_end) : null;
+    ${show.map(m => { const left = m.pass_end ? daysBetween(today, m.pass_end) : null;
       return `<tr class="click ${A.sel === m.id ? 'sel' : ''}" data-row="${m.id}"><td><b>${esc(m.name)}</b></td><td>${dot(m.birth)}</td>
-      <td>${esc(c ? c.name : '—')}</td><td>${esc(c && c.teacher_id ? staffName(c.teacher_id) : '—')}</td><td>${esc(m.guardian_phone1 || '—')}</td><td>${esc(m.shuttle_route || '—')}</td>
+      <td>${esc(clsNames(m.id) || '—')}</td><td>${esc(teacherNames(m.id) || '—')}</td><td>${esc(m.guardian_phone1 || '—')}</td><td>${esc(m.shuttle_route || '—')}</td>
       <td>${m.pass_end ? dot(m.pass_end) + (left !== null && left >= 0 && left <= 7 ? ` <span class="badge b-warn">D-${left}</span>` : left < 0 ? ' <span class="badge b-gray">만료</span>' : '') : '—'}</td>
       <td>${statusBadge(m.status)}</td></tr>`; }).join('')}
     </tbody></table></div><div class="small muted" style="padding:10px 14px">${rows.length}명${rows.length > 300 ? ' 중 300명 표시 — 검색으로 좁혀 주세요' : ''}</div>`
@@ -80,14 +80,14 @@ async function renderDetail(id) {
     q(sb.from('member_status_log').select('*').eq('member_id', id).order('created_at', { ascending: false }).limit(5))
   ]);
   A.detail = { m, priv: priv || {} };
-  const c = clsById(m.class_id);
+  const cls = enrolledClasses(m.id);
   box.innerHTML = `<div class="col" style="gap:16px">
     <div class="spread"><div><div style="font-size:21px;font-weight:700">${esc(m.name)} ${statusBadge(m.status)}</div>
       <div class="small muted">${m.gender ? esc(m.gender) + ' · ' : ''}${dot(m.birth)}</div></div>
       ${adm ? '<button class="btn sm" data-act="edit">수정</button>' : ''}</div>
     <dl style="margin:0;display:grid;grid-template-columns:100px 1fr;gap:9px 12px;font-size:14px">
       ${m.kind === 'child' ? `<dt class="muted">학교</dt><dd style="margin:0">${esc(m.school || '—')}</dd>` : ''}
-      <dt class="muted">반</dt><dd style="margin:0">${esc(clsLabel(c))}${c ? ' · ' + esc(staffName(c.teacher_id)) : ''}</dd>
+      <dt class="muted">수강 반 ${cls.length}</dt><dd style="margin:0">${cls.length ? cls.map(c => `<div><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${tColor(c.teacher_id)};margin-right:6px"></span>${esc(clsLabel(c))} · ${esc(staffName(c.teacher_id))}</div>`).join('') : '—'}</dd>
       <dt class="muted">${m.kind === 'child' ? '보호자 전화 1' : '전화'}</dt><dd style="margin:0">${esc(m.guardian_phone1 || '—')}</dd>
       ${m.kind === 'child' ? `<dt class="muted">보호자 전화 2</dt><dd style="margin:0">${esc(m.guardian_phone2 || '—')}</dd>
       <dt class="muted">셔틀 노선</dt><dd style="margin:0">${esc(m.shuttle_route || '미이용')}</dd>` : ''}
@@ -116,13 +116,14 @@ function memberForm(m, p) {
       <label class="f">생년월일<input name="birth" type="date" value="${esc(m.birth || '')}"></label>
       <label class="f">성별<select name="gender"><option value="">—</option>${opt('남', m.gender)}${opt('여', m.gender)}</select></label>
       <label class="f">학교<input name="school" value="${esc(m.school || '')}"></label>
-      <label class="f">반<select name="class_id"><option value="">반 없음</option>${A.classes.filter(c => c.active).map(c => `<option value="${c.id}" ${m.class_id === c.id ? 'selected' : ''}>${esc(clsLabel(c))}</option>`).join('')}</select></label>
       <label class="f">보호자 전화 1<input name="guardian_phone1" inputmode="tel" value="${esc(m.guardian_phone1 || '')}"></label>
       <label class="f">보호자 전화 2<input name="guardian_phone2" inputmode="tel" value="${esc(m.guardian_phone2 || '')}"></label>
       <label class="f">셔틀 노선<input name="shuttle_route" list="routeList" value="${esc(m.shuttle_route || '')}"><datalist id="routeList">${['신곡', '금오', '장암', '의정부1동', '호원', '용현', ...routes()].filter((x, i, a) => a.indexOf(x) === i).map(r => `<option value="${esc(r)}">`).join('')}</datalist></label>
       <label class="f">최초 등록일<input name="first_registered" type="date" value="${esc(m.first_registered || '')}"></label>
       <label class="f">수강권 만료일<input name="pass_end" type="date" value="${esc(m.pass_end || '')}"></label>
     </div>
+    <fieldset style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0"><legend class="small" style="color:var(--mid);padding:0 4px">수강 반 (여러 개 선택 가능 — 요일·시간·선생님이 다르면 각각 체크)</legend>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:6px;max-height:220px;overflow:auto">${A.classes.filter(c => c.active).sort((a, b) => (a.days[0] - b.days[0]) || String(a.start_time).localeCompare(String(b.start_time))).map(c => `<label class="row small" style="gap:6px;flex-wrap:nowrap;padding:4px 6px;border-radius:6px;background:${tColor(c.teacher_id)}33"><input type="checkbox" name="cls_${c.id}" ${(m.id ? A.enr.some(e => e.member_id === m.id && e.class_id === c.id) : false) ? 'checked' : ''}>${esc(clsLabel(c))} · ${esc(staffName(c.teacher_id))}</label>`).join('')}</div></fieldset>
     <div class="note-box col"><div class="small bold" style="color:var(--amber)">🔒 직원 전용 (학부모 비공개)</div>
       <label class="f">주소<input name="address" value="${esc(p.address || '')}"></label>
       <label class="f">메모<textarea name="memo" rows="3">${esc(p.memo || '')}</textarea></label></div>
@@ -158,14 +159,20 @@ async function saveMember(form) {
   const f = formData(form);
   if (!f.name) return toast('이름을 입력해 주세요.', true);
   const row = { kind: f.kind, name: f.name, birth: f.birth || null, gender: f.gender || null, school: f.school || null,
-    class_id: f.class_id || null, guardian_phone1: f.guardian_phone1 || null, guardian_phone2: f.guardian_phone2 || null,
+    guardian_phone1: f.guardian_phone1 || null, guardian_phone2: f.guardian_phone2 || null,
     shuttle_route: f.shuttle_route || null, pass_end: f.pass_end || null };
   if (f.first_registered) row.first_registered = f.first_registered;
+  const clsIds = Object.keys(f).filter(k => k.startsWith('cls_')).map(k => k.slice(4));
+  row.class_id = clsIds[0] || null; // 대표 반 (결제·담당 기준)
   try {
     let id = f.id;
     if (id) await q(sb.from('members').update(row).eq('id', id));
     else id = (await q(sb.from('members').insert(row).select('id').single())).id;
     await q(sb.from('member_private').upsert({ member_id: id, address: f.address || null, memo: f.memo || null }));
+    const had = A.enr.filter(e => e.member_id === id).map(e => e.class_id);
+    const drop = had.filter(c => !clsIds.includes(c)), add = clsIds.filter(c => !had.includes(c));
+    if (drop.length) await q(sb.from('enrollments').delete().eq('member_id', id).in('class_id', drop));
+    if (add.length) await q(sb.from('enrollments').insert(add.map(c => ({ member_id: id, class_id: c }))));
     toast('저장했어요'); await loadMembers(); A.sel = id; renderMemberList(); renderDetail(id);
   } catch (e) { fail(e); }
 }
@@ -181,7 +188,7 @@ async function saveStatus(form) {
 function exportCsv(rows) {
   const head = ['이름', '생년월일', '성별', '학교', '반', '보호자전화1', '보호자전화2', '셔틀', '최초등록일', '수강권만료', '상태'];
   const cell = (x) => { let s = String(x ?? ''); if (/^[=+\-@]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };
-  const lines = [head.map(cell).join(',')].concat(rows.map(m => [m.name, m.birth, m.gender, m.school, (clsById(m.class_id) || {}).name, m.guardian_phone1, m.guardian_phone2, m.shuttle_route, m.first_registered, m.pass_end, m.status].map(cell).join(',')));
+  const lines = [head.map(cell).join(',')].concat(rows.map(m => [m.name, m.birth, m.gender, m.school, clsNames(m.id), m.guardian_phone1, m.guardian_phone2, m.shuttle_route, m.first_registered, m.pass_end, m.status].map(cell).join(',')));
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `회원명단_${todayStr()}.csv`; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);

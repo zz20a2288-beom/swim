@@ -166,7 +166,7 @@ function formCalc() {
   if (form.list_price.value && form.amount.value && document.activeElement !== form.unpaid) form.unpaid.value = Math.max(0, lp - am);
   const m = A.members.find(x => memLabel(x) === form.member.value), el = document.getElementById('memInfo');
   const months = +form.months.value;
-  if (m && !form.product.value && months) { const c = clsById(m.class_id); if (c) form.product.value = `${c.name} ${months}개월`; }
+  if (m && !form.product.value && months) { const c = enrolledClasses(m.id)[0]; if (c) form.product.value = `${c.name} ${months}개월`; }
   if (!m) { el.textContent = ''; return; }
   const today = todayStr(), base = m.pass_end && m.pass_end >= today ? m.pass_end : addDays(today, -1);
   el.textContent = `현재 수강권 ${m.pass_end ? dot(m.pass_end) + '까지' : '없음'}` + (months ? ` → 등록 후 ${dot(addMonths(base, months))}까지` : ' (기간 변동 없음)');
@@ -232,7 +232,7 @@ function exportSales(rows) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `매출_${A.sf.from}_${A.sf.to}.csv`; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
-function memLabel(m) { const c = clsById(m.class_id); return `${m.name} (${c ? c.name : '반 없음'} · ${m.birth ? m.birth.slice(0, 4) : '—'})`; }
+function memLabel(m) { return `${m.name} (${clsNames(m.id) || '반 없음'} · ${m.birth ? m.birth.slice(0, 4) : '—'})`; }
 
 /* 결제 링크 탭 */
 async function linksTab(v) {
