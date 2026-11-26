@@ -22,7 +22,8 @@ const methodBadge = (m) => `<span class="badge ${m === '서비스' ? 'b-gray' : 
 function productOf(p) {
   const raw = p.product_name || (p.sale_type === '수강권' ? '수강권 ' + p.months + '개월' : p.sale_type);
   const c = [...A.classes].sort((a, b) => b.name.length - a.name.length).find(c => raw === c.name || raw.startsWith(c.name + ' '));
-  return c ? clsTime(c) + raw.slice(c.name.length) : raw;
+  const out = c ? clsTime(c) + raw.slice(c.name.length) : raw;
+  return out.replace(/\s*(초급|중급|상급)(반)?\s*/g, ' ').replace(/\s+/g, ' ').trim() || raw;
 }
 
 A.pages.payments = async (v) => {
