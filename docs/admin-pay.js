@@ -18,7 +18,12 @@ function presetRange(p) {
 }
 const saleNo = (p) => p.id.replace(/-/g, '').slice(0, 8);
 const methodBadge = (m) => `<span class="badge ${m === '서비스' ? 'b-gray' : m === '계좌이체' ? 'b-warn' : m === '현금' ? 'b-ok' : 'b-kid'}">${esc(m)}</span>`;
-const productOf = (p) => p.product_name || (p.sale_type === '수강권' ? '수강권 ' + p.months + '개월' : p.sale_type);
+// 매출 이름: 반 이름(초급 A 등)으로 시작하면 '요일 시간'으로 바꿔서 표시
+function productOf(p) {
+  const raw = p.product_name || (p.sale_type === '수강권' ? '수강권 ' + p.months + '개월' : p.sale_type);
+  const c = [...A.classes].sort((a, b) => b.name.length - a.name.length).find(c => raw === c.name || raw.startsWith(c.name + ' '));
+  return c ? clsTime(c) + raw.slice(c.name.length) : raw;
+}
 
 A.pages.payments = async (v) => {
   if (!A.sf) sfReset();
