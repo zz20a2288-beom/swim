@@ -14,7 +14,7 @@ A.pages.members = async (v) => {
   <div class="card row" style="padding:12px">
     <input class="inp" style="flex:1 1 220px" type="search" id="mq" placeholder="이름, 보호자 전화, 학교로 검색" aria-label="회원 검색" value="${esc(A.mf.q)}">
     <select class="inp" style="width:auto" id="mstatus" aria-label="상태">${['재원', '휴회', '탈회', ''].map(s => `<option value="${s}" ${A.mf.status === s ? 'selected' : ''}>${s || '상태 전체'}</option>`).join('')}</select>
-    <select class="inp" style="width:auto" id="mcls" aria-label="반"><option value="">반 전체</option><option value="none" ${A.mf.cls === 'none' ? 'selected' : ''}>반 없음</option>${A.classes.map(c => `<option value="${c.id}" ${A.mf.cls === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
+    <select class="inp" style="width:auto" id="mcls" aria-label="반"><option value="">반 전체</option><option value="none" ${A.mf.cls === 'none' ? 'selected' : ''}>반 없음</option>${A.classes.map(c => `<option value="${c.id}" ${A.mf.cls === c.id ? 'selected' : ''}>${esc(clsFull(c))}</option>`).join('')}</select>
     <select class="inp" style="width:auto" id="mteacher" aria-label="담당 선생님"><option value="">담당 선생님 전체</option>${A.staff.filter(s => s.active).map(s => `<option value="${s.user_id}" ${A.mf.teacher === s.user_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}<option value="none" ${A.mf.teacher === 'none' ? 'selected' : ''}>담당 없음</option></select>
     <select class="inp" style="width:auto" id="mroute" aria-label="셔틀 노선"><option value="">셔틀 전체</option>${routes().map(r => `<option ${A.mf.route === r ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select>
     <label class="row small"><input type="checkbox" id="mexp" ${A.mf.expiring ? 'checked' : ''}> 만료 7일 이내</label>

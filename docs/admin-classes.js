@@ -83,10 +83,10 @@ function dayTable(list) {
       h += `<tr class="${r === 0 ? 'dt-top' : ''}">` + (r === 0 ? `<th rowspan="${rows}" class="dt-time">${slotLabel(t)}<div class="small muted" style="font-weight:400">${t}</div></th>` : '');
       tids.forEach((tid, i) => {
         const col = cols[i], it = col.items[r], bg = col.has ? `background:${tColor(tid)}` : '';
-        if (it && it.label) h += `<td colspan="5" style="${bg};font-size:12px;font-weight:700"><button class="linkbtn" data-cls="${it.label.id}">▸ ${esc(it.label.name)} (${live(it.label).length}/${it.label.capacity})</button></td>`;
+        if (it && it.label) h += `<td colspan="5" style="${bg};font-size:12px;font-weight:700"><button class="linkbtn" data-cls="${it.label.id}">▸ ${esc(clsTime(it.label))} (${live(it.label).length}/${it.label.capacity})</button></td>`;
         else if (it) {
           const k = it.k, off = k.status === '휴회';
-          h += `<td style="${bg}" class="dt-name"><button class="linkbtn" data-cls="${it.c.id}" title="${esc(it.c.name)}" style="${off ? 'opacity:.55' : ''}">${esc(k.name)}${off ? '<span class="small">(휴)</span>' : ''}</button></td><td style="${bg}">${esc(kAge(k.birth))}</td><td style="${bg}">${esc(k.gender || '')}</td><td style="${bg}">${esc(kidCode(k.id))}</td><td style="${bg}">${esc(STEPS[A.cs.prog[k.id] || 0])}</td>`;
+          h += `<td style="${bg}" class="dt-name"><button class="linkbtn" data-cls="${it.c.id}" title="${esc(clsTime(it.c))}" style="${off ? 'opacity:.55' : ''}">${esc(k.name)}${off ? '<span class="small">(휴)</span>' : ''}</button></td><td style="${bg}">${esc(kAge(k.birth))}</td><td style="${bg}">${esc(k.gender || '')}</td><td style="${bg}">${esc(kidCode(k.id))}</td><td style="${bg}">${esc(STEPS[A.cs.prog[k.id] || 0])}</td>`;
         } else if (r === 0 && col.has && !col.items.length) h += `<td colspan="5" style="${bg}" class="small"><button class="linkbtn" data-cls="${col.first.id}">${esc(col.first.name)} · 아직 아이가 없어요</button></td>`;
         else h += `<td style="${bg}"></td><td style="${bg}"></td><td style="${bg}"></td><td style="${bg}"></td><td style="${bg}"></td>`;
       });
@@ -103,7 +103,7 @@ function weekGrid(list, td) {
   return `<div class="tt"><div class="tr" style="grid-template-columns:64px repeat(${cols},minmax(0,1fr))"><div class="th"></div>${DAYS.slice(0, cols).map((d, i) => `<div class="th ${i === td ? 'today' : ''}">${d}${i === td ? ' (오늘)' : ''}</div>`).join('')}</div>
     ${times.map(t => `<div class="tr" style="grid-template-columns:64px repeat(${cols},minmax(0,1fr))"><div class="tm">${slotLabel(t)}</div>${[...Array(cols).keys()].map(d => `<div class="cell">${list.filter(c => hm(c.start_time) === t && c.days.includes(d)).map(c => {
       const n = classMembers(c.id).filter(m => m.status === '재원').length;
-      return `<button type="button" class="cls ${A.cs.sel === c.id ? 'on' : ''}" data-cls="${c.id}" style="background:${tColor(c.teacher_id)};color:#0F1B2D"><b>${esc(c.name)}</b><span>${esc(staffName(c.teacher_id))} · ${esc(c.level)} · ${n}/${c.capacity}</span></button>`; }).join('')}</div>`).join('')}</div>`).join('')}</div>`;
+      return `<button type="button" class="cls ${A.cs.sel === c.id ? 'on' : ''}" data-cls="${c.id}" style="background:${tColor(c.teacher_id)};color:#0F1B2D"><b>${esc(staffName(c.teacher_id))}</b><span>${n}/${c.capacity}명</span></button>`; }).join('')}</div>`).join('')}</div>`).join('')}</div>`;
 }
 
 async function renderRoster() {
@@ -122,7 +122,7 @@ async function renderRoster() {
       step: p.step || 0, note: p.teacher_note || '', note0: p.teacher_note || '', step0: p.step || 0 }; });
   const meets = c.days.includes(dow(A.cs.date));
   box.innerHTML = `<div class="col" style="gap:12px">
-    <div class="spread"><div><div style="font-size:19px;font-weight:700">${esc(c.name)}</div>
+    <div class="spread"><div><div style="font-size:19px;font-weight:700">${esc(clsTime(c))} <span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:14px;background:${tColor(c.teacher_id)}">${esc(staffName(c.teacher_id))}</span></div>
       <div class="small muted">${esc(staffName(c.teacher_id))} 강사 · ${daysText(c.days)} ${hm(c.start_time)} · ${kids.filter(k => k.status === '재원').length}/${c.capacity}명</div></div>
       ${isAdmin() ? '<button class="btn sm" data-act="editcls">반 수정</button>' : ''}</div>
     <label class="f" style="max-width:200px">출석 날짜<input type="date" id="rdate" value="${A.cs.date}"></label>
@@ -161,7 +161,7 @@ async function saveAttendance() {
 function classForm(c) {
   return `<form id="cForm" class="col"><h2>${c.id ? '반 수정' : '새 반'}</h2><input type="hidden" name="id" value="${esc(c.id || '')}">
     <div class="form-grid">
-      <label class="f">반 이름 *<input name="name" required value="${esc(c.name || '')}" placeholder="예: 초급 A"></label>
+      <label class="f">반 이름 *<input name="name" required value="${esc(c.name || '')}" placeholder="예: 화목4시 (내부 구분용)"></label>
       <input type="hidden" name="kind" value="child">
       <label class="f">레벨<select name="level">${['초급', '중급', '상급'].map(l => `<option ${c.level === l ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <label class="f">시작 시간<input name="start_time" type="time" required value="${esc(hm(c.start_time) || '16:00')}"></label>

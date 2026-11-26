@@ -166,7 +166,7 @@ function formCalc() {
   if (form.list_price.value && form.amount.value && document.activeElement !== form.unpaid) form.unpaid.value = Math.max(0, lp - am);
   const m = A.members.find(x => memLabel(x) === form.member.value), el = document.getElementById('memInfo');
   const months = +form.months.value;
-  if (m && !form.product.value && months) { const c = enrolledClasses(m.id)[0]; if (c) form.product.value = `${c.name} ${months}개월`; }
+  if (m && !form.product.value && months) { const c = enrolledClasses(m.id)[0]; if (c) form.product.value = `${clsTime(c)} ${months}개월`; }
   if (!m) { el.textContent = ''; return; }
   const today = todayStr(), base = m.pass_end && m.pass_end >= today ? m.pass_end : addDays(today, -1);
   el.textContent = `현재 수강권 ${m.pass_end ? dot(m.pass_end) + '까지' : '없음'}` + (months ? ` → 등록 후 ${dot(addMonths(base, months))}까지` : ' (기간 변동 없음)');
@@ -239,13 +239,13 @@ async function linksTab(v) {
   const links = await q(sb.from('payment_links').select('*').order('created_at', { ascending: false }));
   v.innerHTML = `<div class="tabs" role="tablist"><button role="tab" data-tab2="sales">매출</button><button role="tab" class="on" data-tab2="links">결제 링크</button></div>
   <section class="card col" style="max-width:720px"><p class="small muted" style="margin:0">결제선생 등에서 만든 링크를 등록하면 학부모 앱 '바로 결제하기' 버튼에 연결돼요. 반을 지정한 링크가 있으면 그 링크, 없으면 '전체' 링크로 연결됩니다.</p>
-    ${links.map(l => `<div style="border:1px solid var(--line);border-radius:10px;padding:12px" class="col"><div class="spread"><b class="small">${esc(l.name)}</b><span class="badge ${l.active ? 'b-ok' : 'b-gray'}">${l.target_class_id ? esc((clsById(l.target_class_id) || {}).name || '반') : '전체'}${l.active ? '' : ' · 꺼짐'}</span></div>
+    ${links.map(l => `<div style="border:1px solid var(--line);border-radius:10px;padding:12px" class="col"><div class="spread"><b class="small">${esc(l.name)}</b><span class="badge ${l.active ? 'b-ok' : 'b-gray'}">${l.target_class_id ? esc(clsFull(clsById(l.target_class_id))) : '전체'}${l.active ? '' : ' · 꺼짐'}</span></div>
       <div class="small muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.url)}</div>
       <div class="row"><button class="btn sm" data-togglelink="${l.id}" data-on="${l.active}">${l.active ? '끄기' : '켜기'}</button><button class="btn sm" data-dellink="${l.id}">삭제</button></div></div>`).join('')}
     <form id="lForm" class="col" style="border:1px dashed #9CB3C9;border-radius:10px;padding:12px">
       <label class="f">이름<input name="name" required placeholder="예: 1:5 소그룹 1개월"></label>
       <label class="f">링크 (https://…)<input name="url" type="url" required placeholder="https://"></label>
-      <label class="f">대상<select name="target"><option value="">전체</option>${A.classes.map(c => `<option value="c:${c.id}">${esc(c.name)} 반</option>`).join('')}</select></label>
+      <label class="f">대상<select name="target"><option value="">전체</option>${A.classes.map(c => `<option value="c:${c.id}">${esc(clsFull(c))} 반</option>`).join('')}</select></label>
       <button class="btn">+ 결제 링크 등록</button></form></section>`;
   v.onclick = async (e) => {
     const t = e.target.closest('[data-tab2],[data-dellink],[data-togglelink]'); if (!t) return; const d = t.dataset;

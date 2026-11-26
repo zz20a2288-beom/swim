@@ -4,12 +4,12 @@
 /* ---------- 공지 ---------- */
 A.pages.notices = async (v) => {
   const list = await q(sb.from('notices').select('*').order('pinned', { ascending: false }).order('created_at', { ascending: false }).limit(100));
-  const tgt = (n) => n.target === 'class' ? esc((clsById(n.target_class_id) || {}).name || '반') + ' 반' : '전체';
+  const tgt = (n) => n.target === 'class' ? esc(clsFull(clsById(n.target_class_id))) + ' 반' : '전체';
   v.innerHTML = `<header><h1>학부모 공지</h1><div class="muted small">게시한 공지는 대상 학부모의 앱 '센터 소식'에 바로 보여요.</div></header>
   <div class="wrap2">
     <section class="card side"><form id="nForm" class="col"><h2>공지 작성</h2>
       <label class="f">제목 *<input name="title" required maxlength="100"></label>
-      <label class="f">받는 대상<select name="target"><option value="all">전체 학부모</option>${A.classes.filter(c => c.active).map(c => `<option value="c:${c.id}">${esc(c.name)} 반</option>`).join('')}</select></label>
+      <label class="f">받는 대상<select name="target"><option value="all">전체 학부모</option>${A.classes.filter(c => c.active).map(c => `<option value="c:${c.id}">${esc(clsFull(c))} 반</option>`).join('')}</select></label>
       <label class="f">내용 *<textarea name="body" rows="8" required maxlength="5000"></textarea></label>
       <label class="row small"><input type="checkbox" name="pinned"> 학부모 앱 상단에 고정</label>
       <button class="btn pri block">게시하기</button></form></section>
@@ -185,7 +185,7 @@ A.pages.staff = async (v) => {
   <div class="wrap2">
     <section class="card tight main">${A.staff.length ? `<div class="tbl-wrap"><table class="tbl" style="min-width:560px"><thead><tr><th>이름</th><th>이메일</th><th>역할</th><th>담당 반</th><th>시간표 색깔</th><th>상태</th><th></th></tr></thead><tbody>
       ${A.staff.map(s => `<tr><td class="bold">${esc(s.name)}</td><td class="small">${esc(s.email || '')}</td><td><span class="badge ${s.role === 'admin' ? 'b-navy' : 'b-kid'}">${s.role === 'admin' ? '관리자' : '강사'}</span></td>
-      <td class="small">${esc(A.classes.filter(c => c.teacher_id === s.user_id).map(c => c.name).join(', ') || '—')}</td><td><div class="row" style="gap:6px;flex-wrap:nowrap"><span style="width:18px;height:18px;border-radius:4px;background:${tColor(s.user_id)};flex:none"></span><select class="inp" style="width:auto;height:32px;font-size:13px" data-color="${s.user_id}" aria-label="${esc(s.name)} 색깔"><option value="">자동</option>${TCOLORS.map(([c, n]) => `<option value="${c}" ${s.color === c ? 'selected' : ''}>${n}</option>`).join('')}</select></div></td><td>${s.active ? '<span class="badge b-ok">사용 중</span>' : '<span class="badge b-gray">중지</span>'}</td>
+      <td class="small">${esc(A.classes.filter(c => c.teacher_id === s.user_id).map(clsTime).join(', ') || '—')}</td><td><div class="row" style="gap:6px;flex-wrap:nowrap"><span style="width:18px;height:18px;border-radius:4px;background:${tColor(s.user_id)};flex:none"></span><select class="inp" style="width:auto;height:32px;font-size:13px" data-color="${s.user_id}" aria-label="${esc(s.name)} 색깔"><option value="">자동</option>${TCOLORS.map(([c, n]) => `<option value="${c}" ${s.color === c ? 'selected' : ''}>${n}</option>`).join('')}</select></div></td><td>${s.active ? '<span class="badge b-ok">사용 중</span>' : '<span class="badge b-gray">중지</span>'}</td>
       <td><button class="btn sm" data-edit="${s.user_id}">수정</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">직원이 없어요.</div>'}</section>
     <section class="card side"><form id="stForm" class="col"><h2>직원 등록·변경</h2>
       <div class="info small">① 직원이 관리자 주소(이 화면)에서 '처음이에요 (가입)'으로 가입 → ② 여기서 그 이메일로 등록 → ③ 반·시간표에서 반 수정으로 강사 배정</div>

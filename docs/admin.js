@@ -66,7 +66,7 @@ function classMembers(cid) {
   const ids = new Set(A.enr.filter(e => e.class_id === cid).map(e => e.member_id));
   return A.members.filter(m => ids.has(m.id));
 }
-function clsNames(mid) { return enrolledClasses(mid).map(c => c.name).join(', '); }
+function clsNames(mid) { return enrolledClasses(mid).map(clsTime).join(', '); }
 function teacherNames(mid) { return [...new Set(enrolledClasses(mid).map(c => c.teacher_id).filter(Boolean).map(staffName))].join(', '); }
 function kidCode(mid) {
   const pairs = []; enrolledClasses(mid).forEach(c => { const h = +hm(c.start_time).slice(0, 2); c.days.forEach(d => pairs.push([d, (h > 12 ? h - 12 : h)])); });
@@ -74,7 +74,10 @@ function kidCode(mid) {
 }
 const clsById = (id) => A.classes.find(c => c.id === id);
 const staffName = (id) => (A.staff.find(s => s.user_id === id) || {}).name || '미배정';
-function clsLabel(c) { return c ? `${c.name} · ${daysText(c.days)} ${hm(c.start_time)}` : '—'; }
+// 반 표시: '화목 4시' 형식 (요일 + 시간)
+function clsTime(c) { if (!c) return '—'; const h = +hm(c.start_time).slice(0, 2), m = hm(c.start_time).slice(3); return c.days.map(i => DAYS[i]).join('') + ' ' + (h > 12 ? h - 12 : h) + '시' + (m !== '00' ? ' ' + m + '분' : ''); }
+function clsLabel(c) { return clsTime(c); }
+function clsFull(c) { return c ? clsTime(c) + ' · ' + staffName(c.teacher_id) : '—'; }
 
 function renderShell() {
   const items = NAV.filter(n => isAdmin() || !n[2]);
@@ -140,7 +143,7 @@ A.pages.dashboard = async (v) => {
   <div class="wrap2">
     <section class="card main"><div class="spread" style="margin-bottom:10px"><h2>오늘 수업 <span class="small muted">${todays.length}개 반</span></h2><a href="#classes" class="small">시간표 보기 →</a></div>
       ${todays.length ? `<div class="tbl-wrap"><table class="tbl" style="min-width:480px"><thead><tr><th>시간</th><th>반</th><th>강사</th><th style="width:36%">인원 / 정원</th></tr></thead><tbody>
-      ${todays.map(({ c, n }) => `<tr><td class="bold">${esc(hm(c.start_time))}</td><td>${esc(c.name)}</td><td>${esc(staffName(c.teacher_id))}</td>
+      ${todays.map(({ c, n }) => `<tr><td class="bold">${esc(hm(c.start_time))}</td><td>${esc(clsTime(c))}</td><td>${esc(staffName(c.teacher_id))}</td>
         <td><div class="row" style="flex-wrap:nowrap"><div class="bar ${n >= c.capacity ? 'full' : ''}" style="flex:1"><i style="width:${Math.min(100, Math.round(n / c.capacity * 100))}%"></i></div><span class="small" style="min-width:96px">${n}/${c.capacity}명 · ${n >= c.capacity ? '만석' : '빈자리 ' + (c.capacity - n)}</span></div></td></tr>`).join('')}
       </tbody></table></div>` : '<div class="empty">오늘은 수업이 없어요.</div>'}
     </section>

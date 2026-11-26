@@ -88,6 +88,7 @@ function render() {
     else if (t.dataset.act === 'refresh') load();
   };
 }
+function pTime(c) { const h = +c.start_time.slice(0, 2), m = c.start_time.slice(3); return c.days.map(i => DAYS[i]).join('') + ' ' + (h > 12 ? h - 12 : h) + '시' + (m !== '00' ? ' ' + m + '분' : ''); }
 function homeHtml(k) {
   const cls = k.classes || [], today = todayStr();
   const left = k.pass_end ? daysBetween(today, k.pass_end) : null;
@@ -98,7 +99,7 @@ function homeHtml(k) {
   const now = new Date();
   return `
   <section class="p-card hero"><div class="small muted">우리 아이 수업${k.status === '휴회' ? ' · <b style="color:var(--amber)">휴회 중</b>' : ''}</div>
-    ${cls.length ? `<div class="col" style="gap:8px;margin-top:10px">${cls.map(c => `<div class="p-tile spread" style="background:${esc(c.color)}40;border-left:6px solid ${esc(c.color)}"><div><div class="v" style="margin:0">${esc(daysText(c.days))} ${esc(c.start_time)}</div><div class="l">${esc(c.name)} · ${esc(c.level)}</div></div><div style="text-align:right"><div class="l">선생님</div><div class="v" style="margin:0"><span class="t-chip" style="background:${esc(c.color)}">${esc(c.teacher || '배정 예정')}</span></div></div></div>`).join('')}</div>` : '<div style="font-size:18px;font-weight:700;margin-top:4px">반 배정 전</div>'}</section>
+    ${cls.length ? `<div class="col" style="gap:8px;margin-top:10px">${cls.map(c => `<div class="p-tile spread" style="background:${esc(c.color)}40;border-left:6px solid ${esc(c.color)}"><div><div class="v" style="margin:0">${esc(pTime(c))}</div><div class="l">주 ${c.days.length}회</div></div><div style="text-align:right"><div class="l">선생님</div><div class="v" style="margin:0"><span class="t-chip" style="background:${esc(c.color)}">${esc(c.teacher || '배정 예정')}</span></div></div></div>`).join('')}</div>` : '<div style="font-size:18px;font-weight:700;margin-top:4px">반 배정 전</div>'}</section>
   <section class="p-card"><div class="spread"><h2 style="font-size:16px">진도</h2><span class="small bold" style="color:var(--pri)">지금: ${esc(STEPS[step])}</span></div>
     <div class="stp">${STEPS.map((s, i) => `<div><i class="${i < step ? 'done' : i === step ? 'cur' : ''}" aria-hidden="true">${i < step ? '✓' : i === step ? '●' : ''}</i><span class="${i === step ? 'cur' : ''}">${s}</span></div>`).join('')}</div></section>
   <section class="p-card"><div class="spread"><h2 style="font-size:16px">${now.getMonth() + 1}월 출석</h2><span><b style="font-size:18px">${present}</b> / ${att.length}회</span></div>
