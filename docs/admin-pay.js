@@ -7,10 +7,10 @@ A.pages.payments = async (v) => {
   if (!A.pf.month) A.pf.month = monthStart().slice(0, 7);
   const ms = A.pf.month + '-01', me = addDays(addMonths(ms, 1), -1), six = addMonths(ms, -5);
   const [pays, hist, links, logs] = await Promise.all([
-    q(sb.from('payments').select('*').gte('paid_at', ms).lte('paid_at', me).order('paid_at', { ascending: false }).order('created_at', { ascending: false })),
-    q(sb.from('payments').select('amount,paid_at').gte('paid_at', six).lte('paid_at', me)),
+    q(sb.from('payments').select('*,members!inner(kind)').eq('members.kind', 'child').gte('paid_at', ms).lte('paid_at', me).order('paid_at', { ascending: false }).order('created_at', { ascending: false })),
+    q(sb.from('payments').select('amount,paid_at,members!inner(kind)').eq('members.kind', 'child').gte('paid_at', six).lte('paid_at', me)),
     q(sb.from('payment_links').select('*').order('created_at', { ascending: false })),
-    q(sb.from('member_status_log').select('refund_amount').gte('effective_date', ms).lte('effective_date', me))
+    q(sb.from('member_status_log').select('refund_amount,members!inner(kind)').eq('members.kind', 'child').gte('effective_date', ms).lte('effective_date', me))
   ]);
   A.pdata = { pays, hist, links, logs, ms };
   const pre = A.payIntent && A.members.find(m => m.id === A.payIntent); A.payIntent = null;
@@ -38,14 +38,14 @@ A.pages.payments = async (v) => {
         <td><button class="btn sm" data-delpay="${p.id}" aria-label="결제 삭제">삭제</button></td></tr>`; }).join('')}</tbody></table></div>` : '<div class="empty">결제 내역이 없어요.</div>'}
     </section>
     <section class="card side col"><h2>결제 링크</h2>
-      <p class="small muted" style="margin:0">결제선생 등에서 만든 링크를 등록하면 학부모 앱 '바로 결제하기' 버튼에 연결돼요. (반 지정 → 구분 지정 → 전체 순서로 연결)</p>
-      ${links.map(l => `<div style="border:1px solid var(--line);border-radius:10px;padding:12px" class="col"><div class="spread"><b class="small">${esc(l.name)}</b><span class="badge ${l.active ? 'b-ok' : 'b-gray'}">${l.target_class_id ? esc((clsById(l.target_class_id) || {}).name || '반') : l.target_kind ? KIND[l.target_kind] : '전체'}${l.active ? '' : ' · 꺼짐'}</span></div>
+      <p class="small muted" style="margin:0">결제선생 등에서 만든 링크를 등록하면 학부모 앱 '바로 결제하기' 버튼에 연결돼요. (반을 지정한 링크가 있으면 그 링크, 없으면 '전체' 링크로 연결)</p>
+      ${links.map(l => `<div style="border:1px solid var(--line);border-radius:10px;padding:12px" class="col"><div class="spread"><b class="small">${esc(l.name)}</b><span class="badge ${l.active ? 'b-ok' : 'b-gray'}">${l.target_class_id ? esc((clsById(l.target_class_id) || {}).name || '반') : '전체'}${l.active ? '' : ' · 꺼짐'}</span></div>
         <div class="small muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(l.url)}</div>
         <div class="row"><button class="btn sm" data-togglelink="${l.id}" data-on="${l.active}">${l.active ? '끄기' : '켜기'}</button><button class="btn sm" data-dellink="${l.id}">삭제</button></div></div>`).join('')}
       <form id="lForm" class="col" style="border:1px dashed #9CB3C9;border-radius:10px;padding:12px">
         <label class="f">이름<input name="name" required placeholder="예: 어린이 1:5 소그룹 1개월"></label>
         <label class="f">링크 (https://…)<input name="url" type="url" required placeholder="https://"></label>
-        <label class="f">대상<select name="target"><option value="">전체</option><option value="k:child">어린이 전체</option><option value="k:adult">성인 전체</option>${A.classes.map(c => `<option value="c:${c.id}">${esc(c.name)} 반</option>`).join('')}</select></label>
+        <label class="f">대상<select name="target"><option value="">전체</option>${A.classes.map(c => `<option value="c:${c.id}">${esc(c.name)} 반</option>`).join('')}</select></label>
         <button class="btn">+ 결제 링크 등록</button></form>
     </section>
   </div>`;
@@ -84,7 +84,7 @@ A.pages.payments = async (v) => {
     } catch (err) { fail(err); }
   };
 };
-function memLabel(m) { const c = clsById(m.class_id); return `${m.name} (${c ? c.name : KIND[m.kind]} · ${m.birth ? m.birth.slice(0, 4) : '—'})`; }
+function memLabel(m) { const c = clsById(m.class_id); return `${m.name} (${c ? c.name : '반 없음'} · ${m.birth ? m.birth.slice(0, 4) : '—'})`; }
 function showMemInfo(val) {
   const el = document.getElementById('memInfo'); if (!el) return;
   const m = A.members.find(x => memLabel(x) === val);

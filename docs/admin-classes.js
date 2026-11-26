@@ -4,7 +4,7 @@ A.cs = { sel: null, date: null, teacher: null };
 
 A.pages.classes = async (v) => {
   await loadMembers();
-  A.classes = await q(sb.from('classes').select('*').order('start_time'));
+  A.classes = await q(sb.from('classes').select('*').eq('kind', 'child').order('start_time'));
   if (!A.myId) A.myId = (await sb.auth.getUser()).data.user.id;
   if (A.cs.teacher === null) A.cs.teacher = isAdmin() ? '' : A.myId;
   const list = A.classes.filter(c => c.active && (!A.cs.teacher || (A.cs.teacher === 'none' ? !c.teacher_id : c.teacher_id === A.cs.teacher)));
@@ -63,7 +63,7 @@ async function renderRoster() {
       step: p.step || 0, note: p.teacher_note || '', note0: p.teacher_note || '', step0: p.step || 0 }; });
   const meets = c.days.includes(dow(A.cs.date));
   box.innerHTML = `<div class="col" style="gap:12px">
-    <div class="spread"><div><div style="font-size:19px;font-weight:700">${esc(c.name)} <span class="badge ${c.kind === 'child' ? 'b-kid' : 'b-adult'}">${KIND[c.kind]}</span></div>
+    <div class="spread"><div><div style="font-size:19px;font-weight:700">${esc(c.name)}</div>
       <div class="small muted">${esc(staffName(c.teacher_id))} 강사 · ${daysText(c.days)} ${hm(c.start_time)} · ${kids.filter(k => k.status === '재원').length}/${c.capacity}명</div></div>
       ${isAdmin() ? '<button class="btn sm" data-act="editcls">반 수정</button>' : ''}</div>
     <label class="f" style="max-width:200px">출석 날짜<input type="date" id="rdate" value="${A.cs.date}"></label>
@@ -103,7 +103,7 @@ function classForm(c) {
   return `<form id="cForm" class="col"><h2>${c.id ? '반 수정' : '새 반'}</h2><input type="hidden" name="id" value="${esc(c.id || '')}">
     <div class="form-grid">
       <label class="f">반 이름 *<input name="name" required value="${esc(c.name || '')}" placeholder="예: 초급 A"></label>
-      <label class="f">구분<select name="kind"><option value="child" ${c.kind !== 'adult' ? 'selected' : ''}>어린이</option><option value="adult" ${c.kind === 'adult' ? 'selected' : ''}>성인</option></select></label>
+      <input type="hidden" name="kind" value="child">
       <label class="f">레벨<select name="level">${['초급', '중급', '상급'].map(l => `<option ${c.level === l ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       <label class="f">시작 시간<input name="start_time" type="time" required value="${esc(hm(c.start_time) || '16:00')}"></label>
       <label class="f">정원<input name="capacity" type="number" min="1" max="100" required value="${esc(c.capacity || 5)}"></label>

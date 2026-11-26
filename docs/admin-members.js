@@ -10,10 +10,9 @@ A.pages.members = async (v) => {
   if (intent && intent.expiring) Object.assign(A.mf, { status: '재원', expiring: true });
   v.innerHTML = `
   <header class="spread"><div><h1>회원 관리</h1><div class="muted small" id="mSummary"></div></div>
-    ${isAdmin() ? '<div class="row"><button class="btn" data-act="csv">엑셀(CSV)로 내보내기</button><button class="btn pri" data-act="new">+ 회원 등록</button></div>' : ''}</header>
+    ${isAdmin() ? '<div class="row"><button class="btn" data-act="csv">엑셀(CSV)로 내보내기</button><button class="btn pri" data-act="new">+ 원생 등록</button></div>' : ''}</header>
   <div class="card row" style="padding:12px">
     <input class="inp" style="flex:1 1 220px" type="search" id="mq" placeholder="이름, 보호자 전화, 학교로 검색" aria-label="회원 검색" value="${esc(A.mf.q)}">
-    <div class="seg" role="group" aria-label="구분">${[['', '전체'], ['child', '어린이'], ['adult', '성인']].map(([k, l]) => `<button type="button" data-kind="${k}" class="${A.mf.kind === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     <select class="inp" style="width:auto" id="mstatus" aria-label="상태">${['재원', '휴회', '탈회', ''].map(s => `<option value="${s}" ${A.mf.status === s ? 'selected' : ''}>${s || '상태 전체'}</option>`).join('')}</select>
     <select class="inp" style="width:auto" id="mcls" aria-label="반"><option value="">반 전체</option><option value="none" ${A.mf.cls === 'none' ? 'selected' : ''}>반 없음</option>${A.classes.map(c => `<option value="${c.id}" ${A.mf.cls === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
     <select class="inp" style="width:auto" id="mteacher" aria-label="담당 선생님"><option value="">담당 선생님 전체</option>${A.staff.filter(s => s.active).map(s => `<option value="${s.user_id}" ${A.mf.teacher === s.user_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}<option value="none" ${A.mf.teacher === 'none' ? 'selected' : ''}>담당 없음</option></select>
@@ -59,12 +58,12 @@ function renderMemberList() {
   document.getElementById('mList').innerHTML = rows.length ? `<div class="tbl-wrap"><table class="tbl" style="min-width:720px">
     <thead><tr><th>이름</th><th>생년월일</th><th>반</th><th>담당</th><th>보호자 전화</th><th>셔틀</th><th>수강권 만료</th><th>상태</th></tr></thead><tbody>
     ${show.map(m => { const c = clsById(m.class_id); const left = m.pass_end ? daysBetween(today, m.pass_end) : null;
-      return `<tr class="click ${A.sel === m.id ? 'sel' : ''}" data-row="${m.id}"><td><b>${esc(m.name)}</b> ${kindBadge(m.kind)}</td><td>${dot(m.birth)}</td>
+      return `<tr class="click ${A.sel === m.id ? 'sel' : ''}" data-row="${m.id}"><td><b>${esc(m.name)}</b></td><td>${dot(m.birth)}</td>
       <td>${esc(c ? c.name : '—')}</td><td>${esc(c && c.teacher_id ? staffName(c.teacher_id) : '—')}</td><td>${esc(m.guardian_phone1 || '—')}</td><td>${esc(m.shuttle_route || '—')}</td>
       <td>${m.pass_end ? dot(m.pass_end) + (left !== null && left >= 0 && left <= 7 ? ` <span class="badge b-warn">D-${left}</span>` : left < 0 ? ' <span class="badge b-gray">만료</span>' : '') : '—'}</td>
       <td>${statusBadge(m.status)}</td></tr>`; }).join('')}
     </tbody></table></div><div class="small muted" style="padding:10px 14px">${rows.length}명${rows.length > 300 ? ' 중 300명 표시 — 검색으로 좁혀 주세요' : ''}</div>`
-    : '<div class="empty">조건에 맞는 회원이 없어요.</div>';
+    : '<div class="empty">조건에 맞는 원생이 없어요.</div>';
 }
 
 async function renderDetail(id) {
@@ -84,7 +83,7 @@ async function renderDetail(id) {
   const c = clsById(m.class_id);
   box.innerHTML = `<div class="col" style="gap:16px">
     <div class="spread"><div><div style="font-size:21px;font-weight:700">${esc(m.name)} ${statusBadge(m.status)}</div>
-      <div class="small muted">${KIND[m.kind]}${m.gender ? ' · ' + esc(m.gender) : ''} · ${dot(m.birth)}</div></div>
+      <div class="small muted">${m.gender ? esc(m.gender) + ' · ' : ''}${dot(m.birth)}</div></div>
       ${adm ? '<button class="btn sm" data-act="edit">수정</button>' : ''}</div>
     <dl style="margin:0;display:grid;grid-template-columns:100px 1fr;gap:9px 12px;font-size:14px">
       ${m.kind === 'child' ? `<dt class="muted">학교</dt><dd style="margin:0">${esc(m.school || '—')}</dd>` : ''}
@@ -109,16 +108,16 @@ async function renderDetail(id) {
 
 function memberForm(m, p) {
   const opt = (v, cur) => `<option ${v === cur ? 'selected' : ''}>${esc(v)}</option>`;
-  return `<form id="mForm" class="col" autocomplete="off"><h2>${m.id ? '회원 정보 수정' : '새 회원 등록'}</h2>
+  return `<form id="mForm" class="col" autocomplete="off"><h2>${m.id ? '원생 정보 수정' : '새 원생 등록'}</h2>
     <input type="hidden" name="id" value="${esc(m.id || '')}">
     <div class="form-grid">
-      <label class="f">구분<select name="kind"><option value="child" ${m.kind === 'child' ? 'selected' : ''}>어린이</option><option value="adult" ${m.kind === 'adult' ? 'selected' : ''}>성인</option></select></label>
+      <input type="hidden" name="kind" value="child">
       <label class="f">이름 *<input name="name" required maxlength="40" value="${esc(m.name || '')}"></label>
       <label class="f">생년월일<input name="birth" type="date" value="${esc(m.birth || '')}"></label>
       <label class="f">성별<select name="gender"><option value="">—</option>${opt('남', m.gender)}${opt('여', m.gender)}</select></label>
       <label class="f">학교<input name="school" value="${esc(m.school || '')}"></label>
       <label class="f">반<select name="class_id"><option value="">반 없음</option>${A.classes.filter(c => c.active).map(c => `<option value="${c.id}" ${m.class_id === c.id ? 'selected' : ''}>${esc(clsLabel(c))}</option>`).join('')}</select></label>
-      <label class="f">보호자(본인) 전화 1<input name="guardian_phone1" inputmode="tel" value="${esc(m.guardian_phone1 || '')}"></label>
+      <label class="f">보호자 전화 1<input name="guardian_phone1" inputmode="tel" value="${esc(m.guardian_phone1 || '')}"></label>
       <label class="f">보호자 전화 2<input name="guardian_phone2" inputmode="tel" value="${esc(m.guardian_phone2 || '')}"></label>
       <label class="f">셔틀 노선<input name="shuttle_route" list="routeList" value="${esc(m.shuttle_route || '')}"><datalist id="routeList">${['신곡', '금오', '장암', '의정부1동', '호원', '용현', ...routes()].filter((x, i, a) => a.indexOf(x) === i).map(r => `<option value="${esc(r)}">`).join('')}</datalist></label>
       <label class="f">최초 등록일<input name="first_registered" type="date" value="${esc(m.first_registered || '')}"></label>
@@ -180,9 +179,9 @@ async function saveStatus(form) {
   } catch (e) { fail(e); }
 }
 function exportCsv(rows) {
-  const head = ['구분', '이름', '생년월일', '성별', '학교', '반', '보호자전화1', '보호자전화2', '셔틀', '최초등록일', '수강권만료', '상태'];
+  const head = ['이름', '생년월일', '성별', '학교', '반', '보호자전화1', '보호자전화2', '셔틀', '최초등록일', '수강권만료', '상태'];
   const cell = (x) => { let s = String(x ?? ''); if (/^[=+\-@]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };
-  const lines = [head.map(cell).join(',')].concat(rows.map(m => [KIND[m.kind], m.name, m.birth, m.gender, m.school, (clsById(m.class_id) || {}).name, m.guardian_phone1, m.guardian_phone2, m.shuttle_route, m.first_registered, m.pass_end, m.status].map(cell).join(',')));
+  const lines = [head.map(cell).join(',')].concat(rows.map(m => [m.name, m.birth, m.gender, m.school, (clsById(m.class_id) || {}).name, m.guardian_phone1, m.guardian_phone2, m.shuttle_route, m.first_registered, m.pass_end, m.status].map(cell).join(',')));
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `회원명단_${todayStr()}.csv`; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);

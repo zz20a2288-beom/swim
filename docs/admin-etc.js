@@ -4,12 +4,12 @@
 /* ---------- 공지 ---------- */
 A.pages.notices = async (v) => {
   const list = await q(sb.from('notices').select('*').order('pinned', { ascending: false }).order('created_at', { ascending: false }).limit(100));
-  const tgt = (n) => n.target === 'all' ? '전체' : n.target === 'class' ? esc((clsById(n.target_class_id) || {}).name || '반') + ' 반' : KIND[n.target] + ' 전체';
+  const tgt = (n) => n.target === 'class' ? esc((clsById(n.target_class_id) || {}).name || '반') + ' 반' : '전체';
   v.innerHTML = `<header><h1>학부모 공지</h1><div class="muted small">게시한 공지는 대상 학부모의 앱 '센터 소식'에 바로 보여요.</div></header>
   <div class="wrap2">
     <section class="card side"><form id="nForm" class="col"><h2>공지 작성</h2>
       <label class="f">제목 *<input name="title" required maxlength="100"></label>
-      <label class="f">받는 대상<select name="target"><option value="all">전체</option><option value="child">어린이 전체</option><option value="adult">성인 전체</option>${A.classes.filter(c => c.active).map(c => `<option value="c:${c.id}">${esc(c.name)} 반</option>`).join('')}</select></label>
+      <label class="f">받는 대상<select name="target"><option value="all">전체 학부모</option>${A.classes.filter(c => c.active).map(c => `<option value="c:${c.id}">${esc(c.name)} 반</option>`).join('')}</select></label>
       <label class="f">내용 *<textarea name="body" rows="8" required maxlength="5000"></textarea></label>
       <label class="row small"><input type="checkbox" name="pinned"> 학부모 앱 상단에 고정</label>
       <button class="btn pri block">게시하기</button></form></section>
@@ -51,7 +51,7 @@ A.pages.import = async (v) => {
   <div class="okbox row" style="align-items:flex-start;flex-wrap:nowrap">🛡️ <span>엑셀 파일은 이 컴퓨터의 브라우저 안에서만 읽어요. 파일 자체는 어디에도 올라가지 않고, 아래에서 확인한 내용만 데이터베이스에 저장됩니다.</span></div>
   <section class="card col">
     <div class="form-grid">
-      <label class="f">가져올 종류<select id="iMode"><option value="members:child:재원">어린이 회원 명단</option><option value="members:adult:재원">성인 회원 명단</option><option value="members:child:탈회">어린이 탈회자</option><option value="members:adult:탈회">성인 탈회자</option><option value="payments">결제(매출) 내역</option></select></label>
+      <label class="f">가져올 종류<select id="iMode"><option value="members:child:재원">원생 명단</option><option value="members:child:탈회">탈회자 명단</option><option value="payments">결제(매출) 내역</option></select></label>
       <label class="f">엑셀 파일 (.xlsx, .xls, .csv)<input type="file" id="iFile" accept=".xlsx,.xls,.csv"></label>
     </div>
     <div id="iBody"></div>
@@ -155,7 +155,7 @@ function convertRow(r, kind, mode) {
   const meth = String(pick(r, 'method')); v.method = METHODS.find(m => meth.includes(m)) || (/카|신용|체크/.test(meth) ? '카드' : /이체|계좌|통장/.test(meth) ? '계좌이체' : /현/.test(meth) ? '현금' : /제로/.test(meth) ? '제로페이' : /바우/.test(meth) ? '바우처' : '카드');
   v.months = Math.min(24, Math.max(1, parseInt(String(pick(r, 'months')).replace(/[^0-9]/g, ''), 10) || 1));
   v.type = /신규/.test(String(pick(r, 'type'))) ? '신규' : '재등록';
-  const cands = A.members.filter(m => m.name === v.name && (!v.birth || m.birth === v.birth));
+  const cands = A.members.filter(m => m.kind === 'child' && m.name === v.name && (!v.birth || m.birth === v.birth));
   if (!err && cands.length === 0) err = '회원 없음 (먼저 명단을 가져오세요)';
   if (!err && cands.length > 1) err = '동명이인 — 생년월일 열 필요';
   v.member_id = cands.length === 1 ? cands[0].id : null;
@@ -181,7 +181,7 @@ async function doImport() {
 /* ---------- 직원 권한 ---------- */
 A.pages.staff = async (v) => {
   A.staff = await q(sb.from('staff').select('*').order('name'));
-  v.innerHTML = `<header><h1>직원 권한</h1><div class="muted small">강사는 담당 반의 명단(보호자 전화 포함)·출석·진도만 볼 수 있어요. 주소·메모·결제는 관리자만 봅니다.</div></header>
+  v.innerHTML = `<header><h1>직원 권한</h1><div class="muted small">강사는 모든 원생 명단(보호자 전화 포함)을 보고 출석·진도를 입력할 수 있어요. 주소·메모·결제·초대코드는 관리자만 봅니다.</div></header>
   <div class="wrap2">
     <section class="card tight main">${A.staff.length ? `<div class="tbl-wrap"><table class="tbl" style="min-width:560px"><thead><tr><th>이름</th><th>이메일</th><th>역할</th><th>담당 반</th><th>상태</th><th></th></tr></thead><tbody>
       ${A.staff.map(s => `<tr><td class="bold">${esc(s.name)}</td><td class="small">${esc(s.email || '')}</td><td><span class="badge ${s.role === 'admin' ? 'b-navy' : 'b-kid'}">${s.role === 'admin' ? '관리자' : '강사'}</span></td>
