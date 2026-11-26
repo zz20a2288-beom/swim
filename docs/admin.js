@@ -84,7 +84,7 @@ A.pages.dashboard = async (v) => {
   await loadMembers();
   const today = todayStr(), ms = monthStart(), wk = addDays(today, 7);
   const [pays, logs] = await Promise.all([
-    q(sb.from('payments').select('amount,method,type,members!inner(kind)').eq('members.kind', 'child').gte('paid_at', ms).lte('paid_at', addDays(addMonths(ms, 1), -1))),
+    q(sb.from('payments').select('amount,refund_amount,method,type,members!inner(kind)').eq('members.kind', 'child').gte('paid_at', ms).lte('paid_at', addDays(addMonths(ms, 1), -1))),
     q(sb.from('member_status_log').select('status,refund_amount,members!inner(kind)').eq('members.kind', 'child').gte('effective_date', ms))
   ]);
   const M = A.members, live = M.filter(m => m.status !== '탈회');
@@ -92,8 +92,8 @@ A.pages.dashboard = async (v) => {
   const newCnt = pays.filter(p => p.type === '신규').length, reCnt = pays.length - newCnt;
   const left = logs.filter(l => l.status === '탈회').length;
   const refunds = logs.reduce((s, l) => s + (l.refund_amount || 0), 0);
-  const total = pays.reduce((s, p) => s + p.amount, 0);
-  const byM = METHODS.map(m => [m, pays.filter(p => p.method === m).reduce((s, p) => s + p.amount, 0)]);
+  const total = pays.reduce((s, p) => s + p.amount - (p.refund_amount || 0), 0);
+  const byM = METHODS.concat(['서비스']).map(m => [m, pays.filter(p => p.method === m).reduce((s, p) => s + p.amount, 0)]);
   const maxM = Math.max(1, ...byM.map(x => x[1]));
   const td = dow(today);
   const todays = A.classes.filter(c => c.active && c.days.includes(td)).map(c => {
