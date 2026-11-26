@@ -119,3 +119,14 @@ table.sales td{white-space:nowrap}
 .kv{margin:0;display:grid;grid-template-columns:120px 1fr;gap:8px 12px;font-size:14px} .kv dt{color:var(--sub)} .kv dd{margin:0}
 .receipt{border:1px dashed #C9D3DE;border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:12px}
 @media print{body *{visibility:hidden} .print-area,.print-area *{visibility:visible} .print-area{position:fixed;left:0;top:0;width:100%;border:0}}
+/* 요일별 시간표 (선생님별 색깔) */
+table.dt{border-collapse:collapse;font-size:13px;min-width:100%}
+table.dt th,table.dt td{border:1px solid #D5DDE7;padding:4px 6px;white-space:nowrap;text-align:center;height:26px}
+table.dt thead th{background:#F7F9FC;font-weight:500;color:var(--mid)}
+table.dt th.dt-teacher{font-size:14px;color:var(--ink);font-weight:700}
+table.dt th.dt-teacher b{margin-left:8px}
+table.dt .dt-time{background:#F7F9FC;font-weight:700;min-width:58px}
+table.dt tr.dt-top td,table.dt tr.dt-top th{border-top:2px solid #8FA3B8}
+table.dt td.dt-name{text-align:left;font-weight:700}
+table.dt .dt-m{color:#0A6E9E} table.dt .dt-f{color:#C0392B}
+table.dt td.dt-cnt{font-size:24px;font-weight:700;background:#fff;min-width:44px}

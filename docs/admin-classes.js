@@ -2,55 +2,114 @@
 /* 반·시간표 · 출석 · 진도 */
 A.cs = { sel: null, date: null, teacher: null };
 
+const TCOLORS = [['#4FC3F7', '파랑'], ['#F9C6EE', '분홍'], ['#B9A7D9', '보라'], ['#C5DB9E', '연두'], ['#F8C08F', '주황'], ['#FFE38A', '노랑'], ['#8FD3C7', '청록'], ['#D9D9D9', '회색']];
+function tColor(uid) {
+  if (!uid) return '#EEF2F6';
+  const s = A.staff.find(x => x.user_id === uid);
+  if (s && s.color) return s.color;
+  const i = A.staff.findIndex(x => x.user_id === uid);
+  return TCOLORS[(i < 0 ? 7 : i) % 7][0];
+}
+function timeCode(c) { const h = +hm(c.start_time).slice(0, 2), m = hm(c.start_time).slice(3); return c.days.map(i => DAYS[i]).join('') + (h > 12 ? h - 12 : h) + (m !== '00' ? ':' + m : ''); }
+function slotLabel(t) { const h = +t.slice(0, 2), m = t.slice(3); return `${h > 12 ? h - 12 : h}시${m !== '00' ? ' ' + m + '분' : ''}`; }
+function kAge(b) { return b ? (new Date().getFullYear() - +b.slice(0, 4) + 1) + '세' : ''; }
+
 A.pages.classes = async (v) => {
   await loadMembers();
-  A.classes = await q(sb.from('classes').select('*').eq('kind', 'child').order('start_time'));
+  [A.classes, A.staff] = await Promise.all([
+    q(sb.from('classes').select('*').eq('kind', 'child').order('start_time')),
+    q(sb.from('staff').select('*').order('name'))]);
   if (!A.myId) A.myId = (await sb.auth.getUser()).data.user.id;
-  if (A.cs.teacher === null) A.cs.teacher = isAdmin() ? '' : A.myId;
+  if (A.cs.teacher === null) A.cs.teacher = '';
+  if (!A.cs.view) A.cs.view = 'day';
+  if (A.cs.day == null) A.cs.day = dow(todayStr());
+  const prog = await q(sb.from('progress').select('member_id,step'));
+  A.cs.prog = Object.fromEntries(prog.map(p => [p.member_id, p.step]));
   const list = A.classes.filter(c => c.active && (!A.cs.teacher || (A.cs.teacher === 'none' ? !c.teacher_id : c.teacher_id === A.cs.teacher)));
   if (!A.cs.date) A.cs.date = todayStr();
-  if (!A.cs.sel || !list.find(c => c.id === A.cs.sel)) {
-    const td = dow(todayStr());
-    A.cs.sel = (list.find(c => c.days.includes(td)) || list[0] || {}).id || null;
-  }
-  const times = [...new Set(list.map(c => hm(c.start_time)))].sort();
+  if (A.cs.sel && !list.find(c => c.id === A.cs.sel)) A.cs.sel = null;
   const td = dow(todayStr());
-  const useSun = list.some(c => c.days.includes(6));
-  const cols = useSun ? 7 : 6;
   v.innerHTML = `
-  <header class="spread"><div><h1>반·시간표</h1><div class="muted small">반을 누르면 명단·출석·진도가 열려요. 시간표는 매달 복사할 필요 없이 그대로 이어져요.</div></div>
-    <div class="row"><select class="inp" style="width:auto" id="tfilter" aria-label="담당 선생님"><option value="">모든 선생님</option>${A.staff.filter(s => s.active).map(s => `<option value="${s.user_id}" ${A.cs.teacher === s.user_id ? 'selected' : ''}>${esc(s.name)}${s.user_id === A.myId ? ' (나)' : ''}</option>`).join('')}<option value="none" ${A.cs.teacher === 'none' ? 'selected' : ''}>담당 없음</option></select>
+  <header class="spread"><div><h1>반·시간표</h1><div class="muted small">아이 이름이나 반을 누르면 아래에 명단·출석·진도가 열려요. 시간표는 매달 복사할 필요 없이 그대로 이어져요.</div></div>
+    <div class="row"><div class="seg">${[['day', '요일별 표'], ['week', '주간 시간표']].map(([k, l]) => `<button type="button" data-view="${k}" class="${A.cs.view === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <select class="inp" style="width:auto" id="tfilter" aria-label="담당 선생님"><option value="">모든 선생님</option>${A.staff.filter(s => s.active).map(s => `<option value="${s.user_id}" ${A.cs.teacher === s.user_id ? 'selected' : ''}>${esc(s.name)}${s.user_id === A.myId ? ' (나)' : ''}</option>`).join('')}<option value="none" ${A.cs.teacher === 'none' ? 'selected' : ''}>담당 없음</option></select>
     ${isAdmin() ? '<button class="btn pri" data-act="newcls">+ 반 추가</button>' : ''}</div></header>
-  <div class="row small" style="gap:16px"><span class="row" style="gap:6px"><span class="cls lv-초급" style="width:14px;height:14px;padding:0"></span>초급</span><span class="row" style="gap:6px"><span class="cls lv-중급" style="width:14px;height:14px;padding:0"></span>중급</span><span class="row" style="gap:6px"><span class="cls lv-상급" style="width:14px;height:14px;padding:0"></span>상급</span><span class="muted">· 숫자는 재원 인원/정원</span></div>
-  <div class="wrap2">
-    <section class="card tight main"><div class="tbl-wrap">${list.length ? `<div class="tt">
-      <div class="tr" style="grid-template-columns:64px repeat(${cols},minmax(0,1fr))"><div class="th"></div>${DAYS.slice(0, cols).map((d, i) => `<div class="th ${i === td ? 'today' : ''}">${d}${i === td ? ' (오늘)' : ''}</div>`).join('')}</div>
-      ${times.map(t => `<div class="tr" style="grid-template-columns:64px repeat(${cols},minmax(0,1fr))"><div class="tm">${t}</div>${[...Array(cols).keys()].map(d => `<div class="cell">${list.filter(c => hm(c.start_time) === t && c.days.includes(d)).map(c => {
-        const n = A.members.filter(m => m.class_id === c.id && m.status === '재원').length;
-        return `<button type="button" class="cls lv-${c.level} ${A.cs.sel === c.id ? 'on' : ''}" data-cls="${c.id}"><b>${esc(c.name)}</b><span style="opacity:.85">${esc(staffName(c.teacher_id))} · ${n}/${c.capacity}</span></button>`; }).join('')}</div>`).join('')}</div>`).join('')}
-    </div>` : `<div class="empty">${isAdmin() ? '반이 없어요. + 반 추가를 눌러 주세요.' : '이 선생님이 맡은 반이 없어요. 위에서 다른 선생님을 골라 보세요.'}</div>`}</div></section>
-    <aside class="card side" id="roster" aria-label="반 명단"></aside>
-  </div>`;
+  ${A.cs.view === 'day' ? `<div class="row" style="gap:6px">${DAYS.map((d, i) => `<button class="chip ${A.cs.day === i ? 'on' : ''}" data-day="${i}">${d}${i === td ? ' (오늘)' : ''}</button>`).join('')}</div>
+    <section class="card tight"><div class="tbl-wrap">${dayTable(list)}</div></section>`
+  : `<section class="card tight"><div class="tbl-wrap">${weekGrid(list, td)}</div></section>`}
+  <div class="row small" style="gap:14px">${[...new Set(A.classes.filter(c => c.active).map(c => c.teacher_id))].map(t => `<span class="row" style="gap:6px"><span style="width:16px;height:16px;border-radius:4px;background:${tColor(t)};display:inline-block"></span>${esc(t ? staffName(t) : '담당 없음')}</span>`).join('')}<span class="muted">· 색깔은 '직원 권한'에서 바꿀 수 있어요</span></div>
+  <section class="card" id="roster" aria-label="반 명단"></section>`;
   renderRoster();
   v.onclick = (e) => {
-    const t = e.target.closest('[data-cls],[data-act],[data-att],[data-step]'); if (!t) return;
-    if (t.dataset.cls) { A.cs.sel = t.dataset.cls; v.querySelectorAll('[data-cls]').forEach(b => b.classList.toggle('on', b === t)); renderRoster(); }
+    const t = e.target.closest('[data-cls],[data-act],[data-att],[data-step],[data-day],[data-view]'); if (!t) return;
+    if (t.dataset.view) { A.cs.view = t.dataset.view; route(); }
+    else if (t.dataset.day) { A.cs.day = +t.dataset.day; route(); }
+    else if (t.dataset.cls) { A.cs.sel = t.dataset.cls; v.querySelectorAll('[data-cls]').forEach(b => b.classList.toggle('on', b.dataset.cls === A.cs.sel)); renderRoster(); document.getElementById('roster').scrollIntoView({ behavior: 'smooth' }); }
     else if (t.dataset.att) { const r = A.cs.rows[t.dataset.i]; r.att = r.att === t.dataset.att ? null : t.dataset.att; paintRow(t.dataset.i); }
     else if (t.dataset.step !== undefined) { const r = A.cs.rows[t.dataset.i]; r.step = +t.dataset.step; paintRow(t.dataset.i); }
     else classAction(t.dataset.act);
   };
   v.onchange = (e) => {
     if (e.target.id === 'rdate') { A.cs.date = e.target.value; renderRoster(); }
-    if (e.target.id === 'tfilter') { A.cs.teacher = e.target.value; A.cs.sel = null; route(); }
+    if (e.target.id === 'tfilter') { A.cs.teacher = e.target.value; route(); }
     if (e.target.dataset.note !== undefined) A.cs.rows[e.target.dataset.note].note = e.target.value.trim();
   };
   v.onsubmit = (e) => { e.preventDefault(); if (e.target.id === 'cForm') saveClass(e.target); };
 };
 
+function dayTable(list) {
+  const d = A.cs.day, dayCls = list.filter(c => c.days.includes(d));
+  if (!dayCls.length) return `<div class="empty">${DAYS[d]}요일에는 수업이 없어요.</div>`;
+  const times = [...new Set(dayCls.map(c => hm(c.start_time)))].sort();
+  const order = A.staff.map(s => s.user_id);
+  const tids = [...new Set(dayCls.map(c => c.teacher_id || null))].sort((a, b) => (a ? order.indexOf(a) : 999) - (b ? order.indexOf(b) : 999));
+  const kidsOf = (c) => A.members.filter(m => m.class_id === c.id && m.status !== '탈회').sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  const live = (c) => kidsOf(c).filter(m => m.status === '재원');
+  const dayTotal = dayCls.reduce((s, c) => s + live(c).length, 0);
+  let h = `<table class="dt"><thead><tr><th rowspan="2" class="dt-time">시간</th>${tids.map(t => `<th colspan="5" class="dt-teacher" style="background:${tColor(t)}">${esc(t ? staffName(t) : '담당 없음')} <b>${dayCls.filter(c => (c.teacher_id || null) === t).reduce((s, c) => s + live(c).length, 0)}</b></th>`).join('')}
+    <th colspan="2" class="dt-teacher">${DAYS[d]} 합계 <b>${dayTotal}</b></th></tr>
+    <tr>${tids.map(() => '<th>이름</th><th>나이</th><th>성별</th><th>시간</th><th>진도</th>').join('')}<th class="dt-m">남</th><th class="dt-f">여</th></tr></thead><tbody>`;
+  times.forEach(t => {
+    const slot = dayCls.filter(c => hm(c.start_time) === t);
+    const cols = tids.map(tid => {
+      const cs = slot.filter(c => (c.teacher_id || null) === tid), items = [];
+      cs.forEach(c => { if (cs.length > 1) items.push({ label: c }); kidsOf(c).forEach(k => items.push({ k, c })); });
+      return { has: cs.length > 0, items, first: cs[0] };
+    });
+    const rows = Math.max(3, ...cols.map(x => x.items.length + 1));
+    const slotKids = slot.flatMap(live);
+    const male = slotKids.filter(k => k.gender === '남').length, female = slotKids.filter(k => k.gender === '여').length;
+    for (let r = 0; r < rows; r++) {
+      h += `<tr class="${r === 0 ? 'dt-top' : ''}">` + (r === 0 ? `<th rowspan="${rows}" class="dt-time">${slotLabel(t)}<div class="small muted" style="font-weight:400">${t}</div></th>` : '');
+      tids.forEach((tid, i) => {
+        const col = cols[i], it = col.items[r], bg = col.has ? `background:${tColor(tid)}` : '';
+        if (it && it.label) h += `<td colspan="5" style="${bg};font-size:12px;font-weight:700"><button class="linkbtn" data-cls="${it.label.id}">▸ ${esc(it.label.name)} (${live(it.label).length}/${it.label.capacity})</button></td>`;
+        else if (it) {
+          const k = it.k, off = k.status === '휴회';
+          h += `<td style="${bg}" class="dt-name"><button class="linkbtn" data-cls="${it.c.id}" title="${esc(it.c.name)}" style="${off ? 'opacity:.55' : ''}">${esc(k.name)}${off ? '<span class="small">(휴)</span>' : ''}</button></td><td style="${bg}">${esc(kAge(k.birth))}</td><td style="${bg}">${esc(k.gender || '')}</td><td style="${bg}">${esc(timeCode(it.c))}</td><td style="${bg}">${esc(STEPS[A.cs.prog[k.id] || 0])}</td>`;
+        } else if (r === 0 && col.has && !col.items.length) h += `<td colspan="5" style="${bg}" class="small"><button class="linkbtn" data-cls="${col.first.id}">${esc(col.first.name)} · 아직 아이가 없어요</button></td>`;
+        else h += `<td style="${bg}"></td><td style="${bg}"></td><td style="${bg}"></td><td style="${bg}"></td><td style="${bg}"></td>`;
+      });
+      if (r === 0) h += `<td rowspan="${rows}" class="dt-cnt dt-m">${male}</td><td rowspan="${rows}" class="dt-cnt dt-f">${female}</td>`;
+      h += '</tr>';
+    }
+  });
+  return h + '</tbody></table>';
+}
+function weekGrid(list, td) {
+  if (!list.length) return `<div class="empty">${isAdmin() ? '반이 없어요. + 반 추가를 눌러 주세요.' : '이 선생님이 맡은 반이 없어요.'}</div>`;
+  const times = [...new Set(list.map(c => hm(c.start_time)))].sort();
+  const cols = list.some(c => c.days.includes(6)) ? 7 : 6;
+  return `<div class="tt"><div class="tr" style="grid-template-columns:64px repeat(${cols},minmax(0,1fr))"><div class="th"></div>${DAYS.slice(0, cols).map((d, i) => `<div class="th ${i === td ? 'today' : ''}">${d}${i === td ? ' (오늘)' : ''}</div>`).join('')}</div>
+    ${times.map(t => `<div class="tr" style="grid-template-columns:64px repeat(${cols},minmax(0,1fr))"><div class="tm">${slotLabel(t)}</div>${[...Array(cols).keys()].map(d => `<div class="cell">${list.filter(c => hm(c.start_time) === t && c.days.includes(d)).map(c => {
+      const n = A.members.filter(m => m.class_id === c.id && m.status === '재원').length;
+      return `<button type="button" class="cls ${A.cs.sel === c.id ? 'on' : ''}" data-cls="${c.id}" style="background:${tColor(c.teacher_id)};color:#0F1B2D"><b>${esc(c.name)}</b><span>${esc(staffName(c.teacher_id))} · ${esc(c.level)} · ${n}/${c.capacity}</span></button>`; }).join('')}</div>`).join('')}</div>`).join('')}</div>`;
+}
+
 async function renderRoster() {
   const box = document.getElementById('roster');
   const c = clsById(A.cs.sel);
-  if (!c) { box.innerHTML = '<div class="empty">반을 골라 주세요.</div>'; return; }
+  if (!c) { box.innerHTML = '<div class="empty">위 표에서 아이 이름이나 반을 누르면 출석·진도를 입력할 수 있어요.</div>'; return; }
   box.innerHTML = '<div class="loading">불러오는 중…</div>';
   const kids = A.members.filter(m => m.class_id === c.id && m.status !== '탈회').sort((a, b) => a.name.localeCompare(b.name, 'ko'));
   const ids = kids.map(k => k.id);
@@ -115,7 +174,7 @@ function classForm(c) {
 }
 async function classAction(act) {
   const box = document.getElementById('roster');
-  if (act === 'newcls') box.innerHTML = classForm({});
+  if (act === 'newcls') { box.innerHTML = classForm({}); box.scrollIntoView({ behavior: 'smooth' }); }
   else if (act === 'editcls') box.innerHTML = classForm(clsById(A.cs.sel));
   else if (act === 'cancelcls') renderRoster();
   else if (act === 'saveatt') saveAttendance();

@@ -183,9 +183,9 @@ A.pages.staff = async (v) => {
   A.staff = await q(sb.from('staff').select('*').order('name'));
   v.innerHTML = `<header><h1>직원 권한</h1><div class="muted small">강사는 모든 원생 명단(보호자 전화 포함)을 보고 출석·진도를 입력할 수 있어요. 주소·메모·결제·초대코드는 관리자만 봅니다.</div></header>
   <div class="wrap2">
-    <section class="card tight main">${A.staff.length ? `<div class="tbl-wrap"><table class="tbl" style="min-width:560px"><thead><tr><th>이름</th><th>이메일</th><th>역할</th><th>담당 반</th><th>상태</th><th></th></tr></thead><tbody>
+    <section class="card tight main">${A.staff.length ? `<div class="tbl-wrap"><table class="tbl" style="min-width:560px"><thead><tr><th>이름</th><th>이메일</th><th>역할</th><th>담당 반</th><th>시간표 색깔</th><th>상태</th><th></th></tr></thead><tbody>
       ${A.staff.map(s => `<tr><td class="bold">${esc(s.name)}</td><td class="small">${esc(s.email || '')}</td><td><span class="badge ${s.role === 'admin' ? 'b-navy' : 'b-kid'}">${s.role === 'admin' ? '관리자' : '강사'}</span></td>
-      <td class="small">${esc(A.classes.filter(c => c.teacher_id === s.user_id).map(c => c.name).join(', ') || '—')}</td><td>${s.active ? '<span class="badge b-ok">사용 중</span>' : '<span class="badge b-gray">중지</span>'}</td>
+      <td class="small">${esc(A.classes.filter(c => c.teacher_id === s.user_id).map(c => c.name).join(', ') || '—')}</td><td><div class="row" style="gap:6px;flex-wrap:nowrap"><span style="width:18px;height:18px;border-radius:4px;background:${tColor(s.user_id)};flex:none"></span><select class="inp" style="width:auto;height:32px;font-size:13px" data-color="${s.user_id}" aria-label="${esc(s.name)} 색깔"><option value="">자동</option>${TCOLORS.map(([c, n]) => `<option value="${c}" ${s.color === c ? 'selected' : ''}>${n}</option>`).join('')}</select></div></td><td>${s.active ? '<span class="badge b-ok">사용 중</span>' : '<span class="badge b-gray">중지</span>'}</td>
       <td><button class="btn sm" data-edit="${s.user_id}">수정</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">직원이 없어요.</div>'}</section>
     <section class="card side"><form id="stForm" class="col"><h2>직원 등록·변경</h2>
       <div class="info small">① 직원이 관리자 주소(이 화면)에서 '처음이에요 (가입)'으로 가입 → ② 여기서 그 이메일로 등록 → ③ 반·시간표에서 반 수정으로 강사 배정</div>
@@ -199,6 +199,10 @@ A.pages.staff = async (v) => {
     const t = e.target.closest('[data-edit]'); if (!t) return;
     const s = A.staff.find(x => x.user_id === t.dataset.edit), f = document.getElementById('stForm');
     f.email.value = s.email || ''; f.name.value = s.name; f.role.value = s.role; f.active.checked = s.active; f.name.focus();
+  };
+  v.onchange = async (e) => {
+    const uid = e.target.dataset.color; if (!uid) return;
+    try { await q(sb.from('staff').update({ color: e.target.value || null }).eq('user_id', uid)); toast('색깔을 바꿨어요'); route(); } catch (err) { fail(err); }
   };
   v.onsubmit = async (e) => {
     e.preventDefault(); const f = formData(e.target);
