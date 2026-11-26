@@ -5,7 +5,7 @@ const root = document.getElementById('root');
 const isAdmin = () => A.me && A.me.role === 'admin';
 
 const NAV = [
-  ['dashboard', '대시보드', true], ['members', '회원 관리', true], ['classes', '반·시간표', false],
+  ['dashboard', '대시보드', true], ['members', '회원 관리', false], ['classes', '반·시간표', false],
   ['payments', '결제·매출', true], ['notices', '학부모 공지', true], ['import', '엑셀 가져오기', true], ['staff', '직원 권한', true]
 ];
 

@@ -1,13 +1,13 @@
 'use strict';
 /* 반·시간표 · 출석 · 진도 */
-A.cs = { sel: null, date: null };
+A.cs = { sel: null, date: null, teacher: null };
 
 A.pages.classes = async (v) => {
   await loadMembers();
   A.classes = await q(sb.from('classes').select('*').order('start_time'));
   if (!A.myId) A.myId = (await sb.auth.getUser()).data.user.id;
-  const mine = isAdmin() ? A.classes : A.classes.filter(c => c.teacher_id === A.myId);
-  const list = mine.filter(c => c.active);
+  if (A.cs.teacher === null) A.cs.teacher = isAdmin() ? '' : A.myId;
+  const list = A.classes.filter(c => c.active && (!A.cs.teacher || (A.cs.teacher === 'none' ? !c.teacher_id : c.teacher_id === A.cs.teacher)));
   if (!A.cs.date) A.cs.date = todayStr();
   if (!A.cs.sel || !list.find(c => c.id === A.cs.sel)) {
     const td = dow(todayStr());
@@ -19,7 +19,8 @@ A.pages.classes = async (v) => {
   const cols = useSun ? 7 : 6;
   v.innerHTML = `
   <header class="spread"><div><h1>반·시간표</h1><div class="muted small">반을 누르면 명단·출석·진도가 열려요. 시간표는 매달 복사할 필요 없이 그대로 이어져요.</div></div>
-    ${isAdmin() ? '<button class="btn pri" data-act="newcls">+ 반 추가</button>' : ''}</header>
+    <div class="row"><select class="inp" style="width:auto" id="tfilter" aria-label="담당 선생님"><option value="">모든 선생님</option>${A.staff.filter(s => s.active).map(s => `<option value="${s.user_id}" ${A.cs.teacher === s.user_id ? 'selected' : ''}>${esc(s.name)}${s.user_id === A.myId ? ' (나)' : ''}</option>`).join('')}<option value="none" ${A.cs.teacher === 'none' ? 'selected' : ''}>담당 없음</option></select>
+    ${isAdmin() ? '<button class="btn pri" data-act="newcls">+ 반 추가</button>' : ''}</div></header>
   <div class="row small" style="gap:16px"><span class="row" style="gap:6px"><span class="cls lv-초급" style="width:14px;height:14px;padding:0"></span>초급</span><span class="row" style="gap:6px"><span class="cls lv-중급" style="width:14px;height:14px;padding:0"></span>중급</span><span class="row" style="gap:6px"><span class="cls lv-상급" style="width:14px;height:14px;padding:0"></span>상급</span><span class="muted">· 숫자는 재원 인원/정원</span></div>
   <div class="wrap2">
     <section class="card tight main"><div class="tbl-wrap">${list.length ? `<div class="tt">
@@ -27,7 +28,7 @@ A.pages.classes = async (v) => {
       ${times.map(t => `<div class="tr" style="grid-template-columns:64px repeat(${cols},minmax(0,1fr))"><div class="tm">${t}</div>${[...Array(cols).keys()].map(d => `<div class="cell">${list.filter(c => hm(c.start_time) === t && c.days.includes(d)).map(c => {
         const n = A.members.filter(m => m.class_id === c.id && m.status === '재원').length;
         return `<button type="button" class="cls lv-${c.level} ${A.cs.sel === c.id ? 'on' : ''}" data-cls="${c.id}"><b>${esc(c.name)}</b><span style="opacity:.85">${esc(staffName(c.teacher_id))} · ${n}/${c.capacity}</span></button>`; }).join('')}</div>`).join('')}</div>`).join('')}
-    </div>` : `<div class="empty">${isAdmin() ? '반이 없어요. + 반 추가를 눌러 주세요.' : '담당 반이 없어요. 관리자에게 반 배정을 요청해 주세요.'}</div>`}</div></section>
+    </div>` : `<div class="empty">${isAdmin() ? '반이 없어요. + 반 추가를 눌러 주세요.' : '이 선생님이 맡은 반이 없어요. 위에서 다른 선생님을 골라 보세요.'}</div>`}</div></section>
     <aside class="card side" id="roster" aria-label="반 명단"></aside>
   </div>`;
   renderRoster();
@@ -40,6 +41,7 @@ A.pages.classes = async (v) => {
   };
   v.onchange = (e) => {
     if (e.target.id === 'rdate') { A.cs.date = e.target.value; renderRoster(); }
+    if (e.target.id === 'tfilter') { A.cs.teacher = e.target.value; A.cs.sel = null; route(); }
     if (e.target.dataset.note !== undefined) A.cs.rows[e.target.dataset.note].note = e.target.value.trim();
   };
   v.onsubmit = (e) => { e.preventDefault(); if (e.target.id === 'cForm') saveClass(e.target); };

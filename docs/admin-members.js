@@ -1,6 +1,6 @@
 'use strict';
 /* 회원 관리 */
-A.mf = { q: '', kind: '', status: '재원', cls: '', route: '', expiring: false };
+A.mf = { q: '', kind: '', status: '재원', cls: '', route: '', teacher: '', expiring: false };
 A.sel = null;
 
 A.pages.members = async (v) => {
@@ -10,12 +10,13 @@ A.pages.members = async (v) => {
   if (intent && intent.expiring) Object.assign(A.mf, { status: '재원', expiring: true });
   v.innerHTML = `
   <header class="spread"><div><h1>회원 관리</h1><div class="muted small" id="mSummary"></div></div>
-    <div class="row"><button class="btn" data-act="csv">엑셀(CSV)로 내보내기</button><button class="btn pri" data-act="new">+ 회원 등록</button></div></header>
+    ${isAdmin() ? '<div class="row"><button class="btn" data-act="csv">엑셀(CSV)로 내보내기</button><button class="btn pri" data-act="new">+ 회원 등록</button></div>' : ''}</header>
   <div class="card row" style="padding:12px">
     <input class="inp" style="flex:1 1 220px" type="search" id="mq" placeholder="이름, 보호자 전화, 학교로 검색" aria-label="회원 검색" value="${esc(A.mf.q)}">
     <div class="seg" role="group" aria-label="구분">${[['', '전체'], ['child', '어린이'], ['adult', '성인']].map(([k, l]) => `<button type="button" data-kind="${k}" class="${A.mf.kind === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     <select class="inp" style="width:auto" id="mstatus" aria-label="상태">${['재원', '휴회', '탈회', ''].map(s => `<option value="${s}" ${A.mf.status === s ? 'selected' : ''}>${s || '상태 전체'}</option>`).join('')}</select>
     <select class="inp" style="width:auto" id="mcls" aria-label="반"><option value="">반 전체</option><option value="none" ${A.mf.cls === 'none' ? 'selected' : ''}>반 없음</option>${A.classes.map(c => `<option value="${c.id}" ${A.mf.cls === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
+    <select class="inp" style="width:auto" id="mteacher" aria-label="담당 선생님"><option value="">담당 선생님 전체</option>${A.staff.filter(s => s.active).map(s => `<option value="${s.user_id}" ${A.mf.teacher === s.user_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}<option value="none" ${A.mf.teacher === 'none' ? 'selected' : ''}>담당 없음</option></select>
     <select class="inp" style="width:auto" id="mroute" aria-label="셔틀 노선"><option value="">셔틀 전체</option>${routes().map(r => `<option ${A.mf.route === r ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select>
     <label class="row small"><input type="checkbox" id="mexp" ${A.mf.expiring ? 'checked' : ''}> 만료 7일 이내</label>
   </div>
@@ -26,7 +27,7 @@ A.pages.members = async (v) => {
   v.onchange = (e) => {
     const id = e.target.id;
     if (id === 'mstatus') A.mf.status = e.target.value; else if (id === 'mcls') A.mf.cls = e.target.value;
-    else if (id === 'mroute') A.mf.route = e.target.value; else if (id === 'mexp') A.mf.expiring = e.target.checked; else return;
+    else if (id === 'mroute') A.mf.route = e.target.value; else if (id === 'mteacher') A.mf.teacher = e.target.value; else if (id === 'mexp') A.mf.expiring = e.target.checked; else return;
     renderMemberList();
   };
   v.onclick = async (e) => {
@@ -43,7 +44,8 @@ function filtered() {
   const f = A.mf, qq = f.q.replace(/[-\s]/g, '').toLowerCase(), today = todayStr(), wk = addDays(today, 7);
   return A.members.filter(m =>
     (!f.kind || m.kind === f.kind) && (!f.status || m.status === f.status) &&
-    (!f.cls || (f.cls === 'none' ? !m.class_id : m.class_id === f.cls)) && (!f.route || m.shuttle_route === f.route) &&
+    (!f.cls || (f.cls === 'none' ? !m.class_id : m.class_id === f.cls)) &&
+    (!f.teacher || (f.teacher === 'none' ? !(clsById(m.class_id) || {}).teacher_id : (clsById(m.class_id) || {}).teacher_id === f.teacher)) && (!f.route || m.shuttle_route === f.route) &&
     (!f.expiring || (m.pass_end && m.pass_end >= today && m.pass_end <= wk)) &&
     (!qq || [m.name, m.school, m.guardian_phone1, m.guardian_phone2].some(x => (x || '').replace(/[-\s]/g, '').toLowerCase().includes(qq))));
 }
@@ -55,10 +57,10 @@ function renderMemberList() {
   document.getElementById('mSummary').textContent = `재원 ${A.members.filter(m => m.status === '재원').length} · 휴회 ${live.filter(m => m.status === '휴회').length} · 탈회 ${A.members.length - live.length}`;
   const today = todayStr(), show = rows.slice(0, 300);
   document.getElementById('mList').innerHTML = rows.length ? `<div class="tbl-wrap"><table class="tbl" style="min-width:720px">
-    <thead><tr><th>이름</th><th>생년월일</th><th>반</th><th>보호자 전화</th><th>셔틀</th><th>수강권 만료</th><th>상태</th></tr></thead><tbody>
+    <thead><tr><th>이름</th><th>생년월일</th><th>반</th><th>담당</th><th>보호자 전화</th><th>셔틀</th><th>수강권 만료</th><th>상태</th></tr></thead><tbody>
     ${show.map(m => { const c = clsById(m.class_id); const left = m.pass_end ? daysBetween(today, m.pass_end) : null;
       return `<tr class="click ${A.sel === m.id ? 'sel' : ''}" data-row="${m.id}"><td><b>${esc(m.name)}</b> ${kindBadge(m.kind)}</td><td>${dot(m.birth)}</td>
-      <td>${esc(c ? c.name : '—')}</td><td>${esc(m.guardian_phone1 || '—')}</td><td>${esc(m.shuttle_route || '—')}</td>
+      <td>${esc(c ? c.name : '—')}</td><td>${esc(c && c.teacher_id ? staffName(c.teacher_id) : '—')}</td><td>${esc(m.guardian_phone1 || '—')}</td><td>${esc(m.shuttle_route || '—')}</td>
       <td>${m.pass_end ? dot(m.pass_end) + (left !== null && left >= 0 && left <= 7 ? ` <span class="badge b-warn">D-${left}</span>` : left < 0 ? ' <span class="badge b-gray">만료</span>' : '') : '—'}</td>
       <td>${statusBadge(m.status)}</td></tr>`; }).join('')}
     </tbody></table></div><div class="small muted" style="padding:10px 14px">${rows.length}명${rows.length > 300 ? ' 중 300명 표시 — 검색으로 좁혀 주세요' : ''}</div>`
@@ -71,7 +73,8 @@ async function renderDetail(id) {
   if (id === 'new') { box.innerHTML = memberForm({ kind: 'child', status: '재원', first_registered: todayStr() }, {}); return; }
   const m = A.members.find(x => x.id === id); if (!m) { box.innerHTML = '<div class="empty">회원을 찾을 수 없어요.</div>'; return; }
   box.innerHTML = '<div class="loading">불러오는 중…</div>';
-  const [priv, g, inv, logs] = await Promise.all([
+  const adm = isAdmin();
+  const [priv, g, inv, logs] = !adm ? [null, [], [], []] : await Promise.all([
     q(sb.from('member_private').select('*').eq('member_id', id).maybeSingle()),
     q(sb.from('guardians').select('consent_at').eq('member_id', id)),
     q(sb.from('invites').select('code,expires_at').eq('member_id', id).is('used_at', null).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: false }).limit(1)),
@@ -82,7 +85,7 @@ async function renderDetail(id) {
   box.innerHTML = `<div class="col" style="gap:16px">
     <div class="spread"><div><div style="font-size:21px;font-weight:700">${esc(m.name)} ${statusBadge(m.status)}</div>
       <div class="small muted">${KIND[m.kind]}${m.gender ? ' · ' + esc(m.gender) : ''} · ${dot(m.birth)}</div></div>
-      <button class="btn sm" data-act="edit">수정</button></div>
+      ${adm ? '<button class="btn sm" data-act="edit">수정</button>' : ''}</div>
     <dl style="margin:0;display:grid;grid-template-columns:100px 1fr;gap:9px 12px;font-size:14px">
       ${m.kind === 'child' ? `<dt class="muted">학교</dt><dd style="margin:0">${esc(m.school || '—')}</dd>` : ''}
       <dt class="muted">반</dt><dd style="margin:0">${esc(clsLabel(c))}${c ? ' · ' + esc(staffName(c.teacher_id)) : ''}</dd>
@@ -92,13 +95,13 @@ async function renderDetail(id) {
       <dt class="muted">최초 등록일</dt><dd style="margin:0">${dot(m.first_registered)}</dd>
       <dt class="muted">수강권</dt><dd style="margin:0">${m.pass_end ? dot(m.pass_end) + ' 까지' : '없음'}</dd>
     </dl>
-    <div class="note-box col" style="gap:6px"><div class="small bold" style="color:var(--amber)">🔒 직원 전용 · 학부모에게 보이지 않음</div>
+    ${!adm ? '<div class="small muted">주소·메모·결제·초대코드는 관리자만 볼 수 있어요.</div>' : `<div class="note-box col" style="gap:6px"><div class="small bold" style="color:var(--amber)">🔒 직원 전용 · 학부모에게 보이지 않음</div>
       <div class="small"><span class="muted">주소</span>&nbsp; ${esc((priv && priv.address) || '—')}</div>
-      <div class="small" style="white-space:pre-line"><span class="muted">메모</span>&nbsp; ${esc((priv && priv.memo) || '—')}</div></div>
-    ${m.kind === 'child' ? `<div class="info spread"><div><div class="small">학부모 앱 연결 ${g.length ? `<b>${g.length}명 연결됨</b>` : '<b>미연결</b>'}</div>
+      <div class="small" style="white-space:pre-line"><span class="muted">메모</span>&nbsp; ${esc((priv && priv.memo) || '—')}</div></div>`}
+    ${adm && m.kind === 'child' ? `<div class="info spread"><div><div class="small">학부모 앱 연결 ${g.length ? `<b>${g.length}명 연결됨</b>` : '<b>미연결</b>'}</div>
       ${inv.length ? `<div style="font-size:20px;font-weight:700;letter-spacing:3px">${esc(inv[0].code)}</div><div class="small">${md(inv[0].expires_at.slice(0, 10))}까지 사용 가능 · 1회용</div>` : '<div class="small">초대코드를 만들어 보호자에게 전달하세요</div>'}</div>
       <button class="btn sm" data-act="invite">${inv.length ? '새 코드' : '초대코드 만들기'}</button></div>` : ''}
-    <div class="row"><button class="btn" style="flex:1" data-act="status">휴회·탈회·복귀 처리</button><a class="btn" style="flex:1" href="#payments" data-act="pay">결제 등록</a></div>
+    ${adm ? '<div class="row"><button class="btn" style="flex:1" data-act="status">휴회·탈회·복귀 처리</button><a class="btn" style="flex:1" href="#payments" data-act="pay">결제 등록</a></div>' : ''}
     <div id="statusBox"></div>
     ${logs.length ? `<div class="small muted">${logs.map(l => `${dot(l.effective_date)} ${esc(l.status)}${l.reason ? ' (' + esc(l.reason) + ')' : ''}${l.refund_amount ? ' 환불 ' + won(l.refund_amount) : ''}`).join('<br>')}</div>` : ''}
   </div>`;
